@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import type { GenerateResponse, GradeResponse, SentenceState } from '@/types'
 
 export function usePractice(strictness: number = 2) {
@@ -11,13 +11,22 @@ export function usePractice(strictness: number = 2) {
     grade: null,
     status: 'loading',
   })
+  const recentRef = useRef<Array<{ zh: string; py: string }>>([])
 
   const fetchSentence = useCallback(async () => {
     setState(prev => ({ ...prev, status: 'loading', grade: null, userAnswer: '', pinyinMode: 'hidden' }))
     try {
-      const res = await fetch('/api/generate', { method: 'POST' })
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recent: recentRef.current }),
+      })
       if (!res.ok) throw new Error('Failed to generate')
       const data: GenerateResponse = await res.json()
+      recentRef.current = [
+        { zh: data.sentence_zh, py: data.sentence_py },
+        ...recentRef.current,
+      ].slice(0, 5)
       setState(prev => ({ ...prev, sentence: data, status: 'ready' }))
     } catch {
       setState(prev => ({ ...prev, status: 'ready' }))

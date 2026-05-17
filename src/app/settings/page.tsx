@@ -32,32 +32,44 @@ function SettingsInner() {
     show_pinyin: 'tap', show_hints: 'after',
   })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   const loadSettings = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).single()
-    if (data) setSettings(data)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).single()
+        if (data) {
+          setSettings(data)
+          localStorage.setItem('hanzi_settings', JSON.stringify(data))
+          return
+        }
+      }
+    } catch {}
+    const cached = localStorage.getItem('hanzi_settings')
+    if (cached) { try { setSettings(JSON.parse(cached)) } catch {} }
   }, [supabase])
 
   useEffect(() => { loadSettings() }, [loadSettings])
 
   async function handleSave() {
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('settings').upsert({ ...settings, user_id: user.id }, { onConflict: 'user_id' })
+    localStorage.setItem('hanzi_settings', JSON.stringify(settings))
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from('settings').upsert({ ...settings, user_id: user.id }, { onConflict: 'user_id' })
+      }
+    } catch {}
     if (isFirstRun) {
-      await fetch('/api/words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hsk_level: settings.starting_hsk, exclude_zh: [], count: 20 }),
-      })
-      router.push('/dashboard')
-    } else {
-      setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000)
+      try {
+        await fetch('/api/words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hsk_level: settings.starting_hsk, exclude_zh: [], count: 20 }),
+        })
+      } catch {}
     }
+    router.push('/dashboard')
   }
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -157,7 +169,7 @@ function SettingsInner() {
       <div className="mt-10">
         <button onClick={handleSave} disabled={saving}
           className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium rounded-xl py-3.5 text-sm transition-colors">
-          {saving ? 'Saving…' : saved ? '✓ Saved' : isFirstRun ? 'Start practicing →' : 'Save settings'}
+          {saving ? 'Saving…' : isFirstRun ? 'Start practicing →' : 'Save settings'}
         </button>
       </div>
     </div>

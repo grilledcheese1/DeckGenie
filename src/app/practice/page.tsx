@@ -39,10 +39,11 @@ function PracticeInner() {
     await gsap.to(cardWrapRef.current, {
       opacity: 0, x: -32, duration: 0.25, ease: 'power2.in'
     })
+    gsap.set(cardWrapRef.current, { opacity: 1, x: 0 })
 
     let result
     try {
-      result = await incrementSentence(state.grade?.correct ?? false)
+      result = await incrementSentence(state.grade?.score ?? 0)
     } catch {
       // don't let a tracking failure block the next sentence
     }
@@ -65,6 +66,21 @@ function PracticeInner() {
       { opacity: 0, x: 32 },
       { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' }
     )
+  }
+
+  async function handleDone() {
+    try { await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block nav */ }
+    try {
+      await fetch('/api/words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hsk_level: settings?.starting_hsk ?? 2,
+          count: settings?.words_per_unlock ?? 5,
+        }),
+      })
+    } catch { /* don't block nav */ }
+    router.push('/dashboard')
   }
 
   function handleUnlockComplete(words: CorpusWord[]) {
@@ -108,8 +124,21 @@ function PracticeInner() {
       {/* Sentence area */}
       <div ref={cardWrapRef} className="flex-1">
         {state.status === 'loading' && (
-          <div className="flex items-center justify-center h-48">
-            <div className="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          <div className="animate-pulse">
+            <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 mb-4">
+              <div className="flex items-center justify-between mb-6">
+                <div className="h-3 w-16 bg-stone-800 rounded-full" />
+                <div className="h-3 w-10 bg-stone-800 rounded-full" />
+              </div>
+              <div className="flex flex-col items-center gap-3 py-6">
+                <div className="h-10 w-40 bg-stone-800 rounded-xl" />
+                <div className="h-4 w-24 bg-stone-800/60 rounded-full" />
+              </div>
+            </div>
+            <div className="bg-stone-900 border border-stone-800 rounded-3xl p-5">
+              <div className="h-3 w-32 bg-stone-800 rounded-full mb-4" />
+              <div className="h-12 bg-stone-800 rounded-xl" />
+            </div>
           </div>
         )}
 
@@ -131,15 +160,24 @@ function PracticeInner() {
         )}
       </div>
 
-      {/* Next sentence button — shown after grading */}
+      {/* Next sentence / Done button — shown after grading */}
       {state.status === 'graded' && (
         <div className="mt-6 slide-up">
-          <button
-            onClick={handleNext}
-            className="w-full bg-stone-900 hover:bg-stone-800 border border-stone-800 active:scale-[0.98] text-stone-200 font-medium rounded-2xl py-4 text-sm transition-all"
-          >
-            Next sentence →
-          </button>
+          {sentenceNum === sentencesPerRound ? (
+            <button
+              onClick={handleDone}
+              className="w-full bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 active:scale-[0.98] text-white font-medium rounded-2xl py-4 text-sm transition-all"
+            >
+              Done! →
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              className="w-full bg-stone-900 hover:bg-stone-800 border border-stone-800 active:scale-[0.98] text-stone-200 font-medium rounded-2xl py-4 text-sm transition-all"
+            >
+              Next sentence →
+            </button>
+          )}
         </div>
       )}
 

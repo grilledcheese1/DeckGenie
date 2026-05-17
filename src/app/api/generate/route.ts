@@ -9,6 +9,10 @@ export async function POST(req: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  let body: { recent?: Array<{ zh: string; py: string }> } = {}
+  try { body = await req.json() } catch { /* no body */ }
+  const recent = Array.isArray(body?.recent) ? body.recent.slice(0, 5) : []
+
   const { data: vocab } = await supabase
     .from('vocab_list')
     .select('word_zh, pinyin, english, pos')
@@ -20,13 +24,19 @@ export async function POST(req: NextRequest) {
 
   const vocabCsv = vocab.map(w => `${w.word_zh},${w.pinyin},${w.english},${w.pos}`).join('\n')
 
+  const varietyBlock = recent.length > 0
+    ? `\nRECENT SENTENCES (do NOT reuse similar structure or phrasing):\n${
+        recent.map((s, i) => `${i + 1}. ${s.zh}  [${s.py}]`).join('\n')
+      }\n\nVARIETY RULES — the new sentence MUST differ from ALL recent sentences in at least 2 of these dimensions:\n1. Sentence type: declarative | 吗-question | 呢/吧-tag question | imperative | 如果…就… conditional\n2. Subject: pronoun (我/你/他) | proper noun | bare noun | noun phrase | topic-dropped\n3. Predicate: action verb | stative/psychological verb | adjective predicate | noun predicate\n4. Aspect/tense: none (habitual) | 了 completed | 过 experienced | 在/正在 ongoing | 要/想 intent\n5. Clause count: single clause | compound (因为/所以/但是/虽然/而且)\n6. Object: none | bare noun | 的-phrase modified noun\n`
+    : ''
+
   const prompt = `You are a Chinese language tutor. Generate ONE natural Mandarin sentence for a student to translate into English.
 
 RULES:
 - Use ONLY words from the vocabulary list below (plus essential grammar particles: 的,了,吗,呢,吧,也,都,很,太,比,和,还,就,才,又,再,最,非常,因为,所以,但是,虽然)
 - Sentence must be grammatically correct
 - Difficulty: short to medium length (6–14 characters)
-
+${varietyBlock}
 VOCABULARY (zh,pinyin,english,pos):
 ${vocabCsv}
 
