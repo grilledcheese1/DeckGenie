@@ -63,7 +63,7 @@ export function CharTooltip({
             <span className="font-hanzi text-xl" style={{ color: 'var(--text-primary)' }}>
               {segment}
             </span>
-            <span className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--accent-text)' }}>
               {pinyin}
             </span>
           </div>

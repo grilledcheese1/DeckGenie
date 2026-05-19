@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { CharTooltip } from './CharTooltip'
 import { CharDetailSheet } from './CharDetailSheet'
 import { segmentSentence } from '@/lib/chinese'
@@ -17,10 +17,8 @@ interface ActiveSegment {
 }
 
 export function AnalysisSentence({ sentence, vocabList }: Props) {
-  const [active, setActive]           = useState<ActiveSegment | null>(null)
-  const [showSheet, setShowSheet]     = useState(false)
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const segRefs                         = useRef<(HTMLSpanElement | null)[]>([])
+  const [active, setActive]       = useState<ActiveSegment | null>(null)
+  const [showSheet, setShowSheet] = useState(false)
 
   const segments = segmentSentence(sentence.sentence_zh, sentence.vocab_used)
 
@@ -41,7 +39,7 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
         pos:     vocab.pos,
       }
     }
-    return { pinyin: '—', english: '—', hsk: 1, pos: 'other' }
+    return { pinyin: '', english: '—', hsk: 1 as const, pos: 'other' }
   }
 
   const activeInfo  = active ? getInfoForSegment(active.segment) : null
@@ -49,7 +47,10 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
 
   return (
     <>
-      <div className="relative" style={{ lineHeight: 1.2 }}>
+      <div
+        className="flex flex-wrap items-end"
+        style={{ gap: '2px 4px', lineHeight: 1 }}
+      >
         {segments.map((seg, i) => {
           if (isPunctuation(seg)) {
             return (
@@ -57,9 +58,11 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                 key={i}
                 className="font-hanzi"
                 style={{
-                  fontSize: '32px',
+                  fontSize: '30px',
                   color: 'var(--text-tertiary)',
-                  opacity: active ? 0.3 : 0.7,
+                  alignSelf: 'flex-end',
+                  paddingBottom: '2px',
+                  opacity: active ? 0.25 : 0.6,
                   transition: 'opacity 0.2s',
                 }}
               >
@@ -68,18 +71,21 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
             )
           }
 
+          const info     = getInfoForSegment(seg)
           const isActive = active?.index === i
           const isDimmed = active !== null && !isActive
 
           return (
             <span
               key={i}
-              ref={el => { segRefs.current[i] = el }}
               role="button"
               tabIndex={0}
               aria-pressed={isActive}
-              className="relative inline-block cursor-pointer select-none"
-              style={{ position: 'relative' }}
+              className="relative inline-flex flex-col items-center cursor-pointer select-none"
+              style={{
+                opacity: isDimmed ? 0.28 : 1,
+                transition: 'opacity 0.2s',
+              }}
               onClick={() => {
                 if (isActive) {
                   setActive(null)
@@ -99,32 +105,51 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                   }
                 }
               }}
-              onMouseEnter={() => setHoveredIndex(i)}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onFocus={() => setHoveredIndex(i)}
-              onBlur={() => setHoveredIndex(null)}
             >
+              {/* Pinyin — always visible above */}
               <span
-                className="font-hanzi transition-all duration-200"
+                className="text-center leading-none mb-1"
                 style={{
-                  fontSize: '32px',
-                  display: 'inline-block',
+                  fontSize: '11px',
+                  color: isActive ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                  transition: 'color 0.2s',
+                  minWidth: '100%',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {info.pinyin || ' '}
+              </span>
+
+              {/* Hanzi */}
+              <span
+                className="font-hanzi"
+                style={{
+                  fontSize: '30px',
                   color: 'var(--text-primary)',
-                  opacity: isDimmed ? 0.3 : 1,
-                  filter: isActive ? 'brightness(1.45)' : 'none',
-                  background: isActive
-                    ? 'var(--char-highlight)'
-                    : hoveredIndex === i
-                    ? 'var(--char-hover-bg)'
-                    : 'transparent',
+                  display: 'inline-block',
+                  filter: isActive ? 'brightness(1.5)' : 'none',
+                  background: isActive ? 'var(--char-highlight)' : 'transparent',
                   borderRadius: '4px',
-                  padding: '0 1px',
-                  transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                  padding: '0 2px',
+                  transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                  transition: 'transform 0.15s, filter 0.15s, background 0.15s',
                 }}
               >
                 {seg}
               </span>
 
+              {/* Tap affordance dot */}
+              <span
+                className="block rounded-full mt-1"
+                style={{
+                  width: '3px',
+                  height: '3px',
+                  background: isActive ? 'var(--accent)' : 'var(--border-hover)',
+                  transition: 'background 0.2s',
+                }}
+              />
+
+              {/* Tooltip */}
               {isActive && !showSheet && activeInfo && (
                 <CharTooltip
                   segment={seg}
