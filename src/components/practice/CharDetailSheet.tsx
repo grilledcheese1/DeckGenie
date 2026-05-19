@@ -201,7 +201,7 @@ export function CharDetailSheet({
                         fontSize: '10px',
                       }}
                     >
-                      {t}st
+                      {t}{t === 1 ? 'st' : t === 2 ? 'nd' : t === 3 ? 'rd' : 'th'}
                     </p>
                   </div>
                 )

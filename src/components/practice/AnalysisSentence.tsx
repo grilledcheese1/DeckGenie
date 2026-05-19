@@ -75,6 +75,9 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
             <span
               key={i}
               ref={el => { segRefs.current[i] = el }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isActive}
               className="relative inline-block cursor-pointer select-none"
               style={{ position: 'relative' }}
               onClick={() => {
@@ -85,8 +88,21 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                   setShowSheet(false)
                 }
               }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  if (isActive) {
+                    setActive(null)
+                  } else {
+                    setActive({ segment: seg, index: i })
+                    setShowSheet(false)
+                  }
+                }
+              }}
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
+              onFocus={() => setHoveredIndex(i)}
+              onBlur={() => setHoveredIndex(null)}
             >
               <span
                 className="font-hanzi transition-all duration-200"

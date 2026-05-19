@@ -55,7 +55,7 @@ export const RADICAL_MAP: Record<string, { radical: string; pinyin: string; mean
   '吃': { radical: '口', pinyin: 'kǒu', meaning: 'Mouth — hints at words related to speaking, eating, or drinking.' },
   '说': { radical: '讠', pinyin: 'yán', meaning: 'Speech — appears in words related to language and communication.' },
   '看': { radical: '目', pinyin: 'mù', meaning: 'Eye — appears in words related to seeing and watching.' },
-  '听': { radical: '耳', pinyin: 'ěr', meaning: 'Ear — appears in words related to hearing and listening.' },
+  '听': { radical: '口', pinyin: 'kǒu', meaning: 'Mouth — simplified form of 聽; the 口 component hints at sound and communication.' },
   '走': { radical: '走', pinyin: 'zǒu', meaning: 'Walk — appears in words related to movement and travel.' },
   '来': { radical: '木', pinyin: 'mù', meaning: 'Tree/wood — one of the most common radicals.' },
   '去': { radical: '厶', pinyin: 'sī', meaning: 'Private — a simple structural radical.' },
