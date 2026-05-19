@@ -7,7 +7,9 @@ import { usePractice } from '@/hooks/usePractice'
 import { useProgress } from '@/hooks/useProgress'
 import { SentenceCard } from '@/components/practice/SentenceCard'
 import { UnlockModal } from '@/components/practice/UnlockModal'
-import type { CorpusWord } from '@/types'
+import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
+import { createClient } from '@/lib/supabase/client'
+import type { CorpusWord, VocabWord } from '@/types'
 
 function PracticeInner() {
   const router        = useRouter()
@@ -20,7 +22,11 @@ function PracticeInner() {
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
   const [roundJustComplete, setRoundJustComplete] = useState(false)
   const [sentenceNum, setSentenceNum]             = useState(1)
+  const [analysisMode, setAnalysisMode]           = useState(false)
+  const [vocabList, setVocabList]                 = useState<VocabWord[]>([])
+
   const cardWrapRef = useRef<HTMLDivElement>(null)
+  const contentRef  = useRef<HTMLDivElement>(null)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -33,6 +39,9 @@ function PracticeInner() {
 
   async function handleNext() {
     if (!cardWrapRef.current) { await fetchSentence(); return }
+
+    setAnalysisMode(false)
+    gsap.set(contentRef.current, { y: 0 })
 
     await gsap.to(cardWrapRef.current, {
       opacity: 0, x: -32, duration: 0.25, ease: 'power2.in'
@@ -94,6 +103,37 @@ function PracticeInner() {
     }
   }
 
+  async function enterAnalysis() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('vocab_list')
+      .select('*')
+      .eq('user_id', user.id)
+    setVocabList(data ?? [])
+    setAnalysisMode(true)
+
+    if (contentRef.current) {
+      gsap.to(contentRef.current, {
+        y: 80,
+        duration: 0.45,
+        ease: 'power3.out',
+      })
+    }
+  }
+
+  function exitAnalysis() {
+    setAnalysisMode(false)
+    if (contentRef.current) {
+      gsap.to(contentRef.current, {
+        y: 0,
+        duration: 0.35,
+        ease: 'power3.inOut',
+      })
+    }
+  }
+
   const activeVocabZh: string[] = []
 
   return (
@@ -129,77 +169,137 @@ function PracticeInner() {
         </div>
       </div>
 
-      {/* Sentence area */}
-      <div ref={cardWrapRef} className="flex-1">
-        {state.status === 'loading' && (
-          <div className="animate-pulse">
-            <div
-              className="rounded-3xl p-6 mb-4"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="h-3 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-                <div className="h-3 w-10 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+      <div ref={contentRef} className="flex-1 flex flex-col">
+        {/* Sentence area */}
+        <div ref={cardWrapRef} className="flex-1">
+          {state.status === 'loading' && (
+            <div className="animate-pulse">
+              <div
+                className="rounded-3xl p-6 mb-4"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="h-3 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                  <div className="h-3 w-10 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                </div>
+                <div className="flex flex-col items-center gap-3 py-6">
+                  <div className="h-10 w-40 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                  <div className="h-4 w-24 rounded-full opacity-60" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                </div>
               </div>
-              <div className="flex flex-col items-center gap-3 py-6">
-                <div className="h-10 w-40 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-                <div className="h-4 w-24 rounded-full opacity-60" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+              <div
+                className="rounded-3xl p-5"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
+                <div className="h-3 w-32 rounded-full mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                <div className="h-12 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
               </div>
             </div>
-            <div
-              className="rounded-3xl p-5"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-            >
-              <div className="h-3 w-32 rounded-full mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-              <div className="h-12 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+          )}
+
+          {analysisMode && state.sentence && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  Tap any character to inspect
+                </span>
+                <button
+                  onClick={exitAnalysis}
+                  className="text-xs font-medium transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--accent-text)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Done
+                </button>
+              </div>
+              <AnalysisSentence
+                sentence={state.sentence}
+                vocabList={vocabList}
+              />
+              {state.grade && (
+                <div
+                  className="mt-5 rounded-xl px-4 py-3"
+                  style={{
+                    opacity: 0.4,
+                    background: state.grade.correct
+                      ? 'rgba(5,150,105,0.12)'
+                      : 'var(--error-bg)',
+                    border: `0.5px solid ${state.grade.correct
+                      ? 'rgba(5,150,105,0.4)'
+                      : 'var(--error-border)'}`,
+                  }}
+                >
+                  <span
+                    className="text-sm font-medium"
+                    style={{
+                      color: state.grade.correct ? '#059669' : 'var(--error-text)',
+                    }}
+                  >
+                    {state.grade.correct ? '✓' : '✗'} {state.grade.score}/100
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!analysisMode && state.sentence && state.status !== 'loading' && (
+            <SentenceCard
+              sentence={state.sentence}
+              pinyinMode={state.pinyinMode}
+              showPinyinSetting={settings?.show_pinyin ?? 'tap'}
+              onTogglePinyin={togglePinyin}
+              userAnswer={state.userAnswer}
+              onAnswerChange={setAnswer}
+              onSubmit={submitAnswer}
+              grade={state.grade}
+              status={state.status}
+              showHints={settings?.show_hints ?? 'after'}
+              sentenceNumber={sentenceNum}
+              totalSentences={sentencesPerRound}
+            />
+          )}
+        </div>
+
+        {/* Next sentence / Done button */}
+        {state.status === 'graded' && !analysisMode && (
+          <div className="mt-6 slide-up">
+            {sentenceNum === sentencesPerRound ? (
+              <button
+                onClick={handleDone}
+                className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+                style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
+              >
+                Done! →
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Next sentence →
+              </button>
+            )}
+
+            <div className="mt-3">
+              <button
+                onClick={enterAnalysis}
+                className="w-full rounded-2xl py-3 text-sm transition-all active:scale-[0.98] hover-bg hover-border"
+                style={{
+                  background: 'transparent',
+                  border: '0.5px solid var(--border)',
+                  color: 'var(--text-tertiary)',
+                }}
+              >
+                Analyze sentence
+              </button>
             </div>
           </div>
         )}
-
-        {state.sentence && state.status !== 'loading' && (
-          <SentenceCard
-            sentence={state.sentence}
-            pinyinMode={state.pinyinMode}
-            showPinyinSetting={settings?.show_pinyin ?? 'tap'}
-            onTogglePinyin={togglePinyin}
-            userAnswer={state.userAnswer}
-            onAnswerChange={setAnswer}
-            onSubmit={submitAnswer}
-            grade={state.grade}
-            status={state.status}
-            showHints={settings?.show_hints ?? 'after'}
-            sentenceNumber={sentenceNum}
-            totalSentences={sentencesPerRound}
-          />
-        )}
       </div>
-
-      {/* Next sentence / Done button */}
-      {state.status === 'graded' && (
-        <div className="mt-6 slide-up">
-          {sentenceNum === sentencesPerRound ? (
-            <button
-              onClick={handleDone}
-              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
-              style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
-            >
-              Done! →
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Next sentence →
-            </button>
-          )}
-        </div>
-      )}
 
       {showUnlock && (
         <UnlockModal
