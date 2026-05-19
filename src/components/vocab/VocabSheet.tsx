@@ -9,12 +9,12 @@ const HSK_LEVELS = [1, 2, 3, 4, 5, 6]
 const POS_OPTIONS = ['noun', 'verb', 'adjective', 'adverb', 'other']
 
 const HSK_BADGE_STYLES: Record<number, React.CSSProperties> = {
-  1: { color: '#34d399', backgroundColor: 'rgba(6,78,59,0.5)',   border: '1px solid #065f46' },
-  2: { color: '#38bdf8', backgroundColor: 'rgba(8,47,73,0.5)',   border: '1px solid #0c4a6e' },
-  3: { color: '#a78bfa', backgroundColor: 'rgba(46,16,101,0.5)', border: '1px solid #4c1d95' },
-  4: { color: '#fbbf24', backgroundColor: 'rgba(69,26,3,0.5)',   border: '1px solid #78350f' },
-  5: { color: '#fb7185', backgroundColor: 'rgba(76,5,25,0.5)',   border: '1px solid #881337' },
-  6: { color: '#fb923c', backgroundColor: 'rgba(67,20,7,0.5)',   border: '1px solid #7c2d12' },
+  1: { color: 'var(--hsk-1-color)', backgroundColor: 'var(--hsk-1-bg)', border: '1px solid var(--hsk-1-border)' },
+  2: { color: 'var(--hsk-2-color)', backgroundColor: 'var(--hsk-2-bg)', border: '1px solid var(--hsk-2-border)' },
+  3: { color: 'var(--hsk-3-color)', backgroundColor: 'var(--hsk-3-bg)', border: '1px solid var(--hsk-3-border)' },
+  4: { color: 'var(--hsk-4-color)', backgroundColor: 'var(--hsk-4-bg)', border: '1px solid var(--hsk-4-border)' },
+  5: { color: 'var(--hsk-5-color)', backgroundColor: 'var(--hsk-5-bg)', border: '1px solid var(--hsk-5-border)' },
+  6: { color: 'var(--hsk-6-color)', backgroundColor: 'var(--hsk-6-bg)', border: '1px solid var(--hsk-6-border)' },
 }
 
 interface Filters {
@@ -278,15 +278,6 @@ function WordRow({
   const rowRef     = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(false)
 
-  const HSK_BADGE_S: Record<number, React.CSSProperties> = {
-    1: { color: '#34d399', backgroundColor: 'rgba(6,78,59,0.5)',   border: '1px solid #065f46' },
-    2: { color: '#38bdf8', backgroundColor: 'rgba(8,47,73,0.5)',   border: '1px solid #0c4a6e' },
-    3: { color: '#a78bfa', backgroundColor: 'rgba(46,16,101,0.5)', border: '1px solid #4c1d95' },
-    4: { color: '#fbbf24', backgroundColor: 'rgba(69,26,3,0.5)',   border: '1px solid #78350f' },
-    5: { color: '#fb7185', backgroundColor: 'rgba(76,5,25,0.5)',   border: '1px solid #881337' },
-    6: { color: '#fb923c', backgroundColor: 'rgba(67,20,7,0.5)',   border: '1px solid #7c2d12' },
-  }
-
   const accuracy = word.times_seen > 0 ? word.times_correct / word.times_seen : null
   const dotColor = accuracy === null ? null
     : accuracy >= 0.8 ? '#10b981'
@@ -302,7 +293,7 @@ function WordRow({
       <div className="flex items-center gap-3 min-w-0">
         <span
           className="flex-shrink-0 text-xs font-medium rounded-lg px-1.5 py-0.5"
-          style={HSK_BADGE_S[word.hsk_level]}
+          style={HSK_BADGE_STYLES[word.hsk_level]}
         >
           {word.hsk_level}
         </span>

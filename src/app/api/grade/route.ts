@@ -42,6 +42,7 @@ Respond with ONLY valid JSON, no markdown:
     })
     const raw = (message.content[0] as { type: string; text: string }).text.trim()
     const parsed = JSON.parse(raw)
+    parsed.correct = parsed.score >= 70
 
     if (vocab_used?.length) {
       for (const zh of vocab_used) {

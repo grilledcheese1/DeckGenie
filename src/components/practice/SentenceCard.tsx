@@ -172,8 +172,8 @@ export function SentenceCard({
           <div
             className="rounded-xl px-4 py-3"
             style={grade.correct ? {
-              backgroundColor: 'var(--accent-subtle)',
-              border: '1px solid var(--accent)',
+              backgroundColor: 'rgba(5,150,105,0.12)',
+              border: '1px solid rgba(5,150,105,0.4)',
             } : {
               backgroundColor: 'var(--error-bg)',
               border: '1px solid var(--error-border)',
@@ -182,7 +182,7 @@ export function SentenceCard({
             <div className="flex items-center justify-between mb-1">
               <span
                 className="text-sm font-medium"
-                style={{ color: grade.correct ? 'var(--accent-text)' : 'var(--error-text)' }}
+                style={{ color: grade.correct ? '#059669' : 'var(--error-text)' }}
               >
                 {grade.correct ? '✓ Correct' : '✗ Incorrect'} · {grade.score}/100
               </span>
