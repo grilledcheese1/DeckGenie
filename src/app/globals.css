@@ -27,3 +27,85 @@ textarea:focus {
   outline: none;
   box-shadow: 0 0 0 1.5px rgba(120, 180, 140, 0.4);
 }
+
+/* ── Theme system ─────────────────────────────────── */
+
+/* Default: Ink & Jade (also used when no theme set) */
+:root,
+[data-theme="ink-jade"] {
+  --bg-primary:    #0c0a09;
+  --bg-secondary:  #1c1917;
+  --bg-tertiary:   #292524;
+  --border:        #292524;
+  --border-hover:  #44403c;
+  --text-primary:  #f5f5f4;
+  --text-secondary:#a8a29e;
+  --text-tertiary: #78716c;
+  --accent:        #059669;
+  --accent-hover:  #047857;
+  --accent-subtle: #064e3b;
+  --accent-text:   #6ee7b7;
+  --hanzi-color:   #34d399;
+  --input-bg:      #1c1917;
+  --input-border:  #292524;
+  --input-focus:   #065f46;
+  --error-bg:      rgba(127,29,29,0.3);
+  --error-border:  rgba(153,27,27,0.4);
+  --error-text:    #fca5a5;
+}
+
+[data-theme="vermillion-cream"] {
+  --bg-primary:    #fdf6ec;
+  --bg-secondary:  #f5ead8;
+  --bg-tertiary:   #e8d5b7;
+  --border:        #e8d5b7;
+  --border-hover:  #d4b896;
+  --text-primary:  #2c1810;
+  --text-secondary:#7c5c3e;
+  --text-tertiary: #9a7c5a;
+  --accent:        #c0392b;
+  --accent-hover:  #a93226;
+  --accent-subtle: #fde8e6;
+  --accent-text:   #c0392b;
+  --hanzi-color:   #c0392b;
+  --input-bg:      #fdf6ec;
+  --input-border:  #e8d5b7;
+  --input-focus:   #c0392b;
+  --error-bg:      rgba(192,57,43,0.08);
+  --error-border:  rgba(192,57,43,0.25);
+  --error-text:    #c0392b;
+}
+
+[data-theme="bamboo-light"] {
+  --bg-primary:    #f9fafb;
+  --bg-secondary:  #f3f4f6;
+  --bg-tertiary:   #e5e7eb;
+  --border:        #e5e7eb;
+  --border-hover:  #d1d5db;
+  --text-primary:  #1a1a1a;
+  --text-secondary:#4b5563;
+  --text-tertiary: #6b7280;
+  --accent:        #4d7c5f;
+  --accent-hover:  #3d6b4e;
+  --accent-subtle: #d1fae5;
+  --accent-text:   #065f46;
+  --hanzi-color:   #4d7c5f;
+  --input-bg:      #ffffff;
+  --input-border:  #e5e7eb;
+  --input-focus:   #4d7c5f;
+  --error-bg:      rgba(239,68,68,0.06);
+  --error-border:  rgba(239,68,68,0.2);
+  --error-text:    #dc2626;
+}
+
+[data-theme] body,
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Hover helpers — pair with inline-style base colors */
+.hover-accent:hover { background-color: var(--accent-hover) !important; }
+.hover-border:hover { border-color: var(--border-hover) !important; }
+.hover-bg:hover     { background-color: var(--bg-tertiary) !important; }

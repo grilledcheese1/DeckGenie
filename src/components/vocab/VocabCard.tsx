@@ -4,13 +4,13 @@ import { useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import type { VocabWord } from '@/types'
 
-const HSK_BADGE: Record<number, string> = {
-  1: 'text-emerald-400 bg-emerald-950 border-emerald-900',
-  2: 'text-sky-400 bg-sky-950 border-sky-900',
-  3: 'text-violet-400 bg-violet-950 border-violet-900',
-  4: 'text-amber-400 bg-amber-950 border-amber-900',
-  5: 'text-rose-400 bg-rose-950 border-rose-900',
-  6: 'text-orange-400 bg-orange-950 border-orange-900',
+const HSK_BADGE_STYLES: Record<number, React.CSSProperties> = {
+  1: { color: '#34d399', backgroundColor: 'rgba(6,78,59,0.5)',   border: '1px solid #065f46' },
+  2: { color: '#38bdf8', backgroundColor: 'rgba(8,47,73,0.5)',   border: '1px solid #0c4a6e' },
+  3: { color: '#a78bfa', backgroundColor: 'rgba(46,16,101,0.5)', border: '1px solid #4c1d95' },
+  4: { color: '#fbbf24', backgroundColor: 'rgba(69,26,3,0.5)',   border: '1px solid #78350f' },
+  5: { color: '#fb7185', backgroundColor: 'rgba(76,5,25,0.5)',   border: '1px solid #881337' },
+  6: { color: '#fb923c', backgroundColor: 'rgba(67,20,7,0.5)',   border: '1px solid #7c2d12' },
 }
 
 export function VocabCard({ word }: { word: VocabWord }) {
@@ -37,6 +37,10 @@ export function VocabCard({ word }: { word: VocabWord }) {
   }
 
   const accuracy = word.times_seen > 0 ? word.times_correct / word.times_seen : null
+  const dotColor = accuracy === null ? null
+    : accuracy >= 0.8 ? '#10b981'
+    : accuracy >= 0.5 ? '#f59e0b'
+    : '#ef4444'
 
   return (
     <div
@@ -44,37 +48,41 @@ export function VocabCard({ word }: { word: VocabWord }) {
       className="relative w-full h-full flex flex-col items-center justify-center select-none cursor-pointer"
     >
       {/* HSK badge */}
-      <span className={`absolute top-0 left-0 text-xs font-medium border rounded-lg px-1.5 py-0.5 ${HSK_BADGE[word.hsk_level]}`}>
+      <span
+        className="absolute top-0 left-0 text-xs font-medium rounded-lg px-1.5 py-0.5"
+        style={HSK_BADGE_STYLES[word.hsk_level]}
+      >
         HSK {word.hsk_level}
       </span>
 
       {/* Accuracy dot */}
-      {accuracy !== null && (
-        <div className={`absolute top-0 right-0 w-2 h-2 rounded-full ${
-          accuracy >= 0.8 ? 'bg-emerald-500' : accuracy >= 0.5 ? 'bg-amber-500' : 'bg-red-500'
-        }`} />
+      {dotColor && (
+        <div
+          className="absolute top-0 right-0 w-2 h-2 rounded-full"
+          style={{ backgroundColor: dotColor }}
+        />
       )}
 
       {/* Hanzi — revealed only */}
       {revealed && (
-        <p ref={hanziRef} className="font-hanzi text-6xl text-stone-100 mb-4 leading-none">
+        <p ref={hanziRef} className="font-hanzi text-6xl mb-4 leading-none" style={{ color: 'var(--text-primary)' }}>
           {word.word_zh}
         </p>
       )}
 
       {/* Pinyin — always visible */}
-      <p className="text-2xl text-stone-300 tracking-wide">{word.pinyin}</p>
+      <p className="text-2xl tracking-wide" style={{ color: 'var(--text-secondary)' }}>{word.pinyin}</p>
 
       {/* English — revealed only */}
       {revealed && (
-        <p ref={englishRef} className="text-sm text-stone-400 mt-3 text-center leading-snug max-w-[80%]">
+        <p ref={englishRef} className="text-sm mt-3 text-center leading-snug max-w-[80%]" style={{ color: 'var(--text-secondary)' }}>
           {word.english}
         </p>
       )}
 
       {/* Tap hint */}
       {!revealed && (
-        <p className="absolute bottom-0 text-xs text-stone-700">tap to reveal</p>
+        <p className="absolute bottom-0 text-xs" style={{ color: 'var(--text-tertiary)' }}>tap to reveal</p>
       )}
     </div>
   )

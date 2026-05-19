@@ -12,8 +12,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${notoSerifSC.variable}`}>
-      <body className="bg-stone-950 text-stone-100 antialiased min-h-screen">
+    <html lang="en" className={`${dmSans.variable} ${notoSerifSC.variable}`} suppressHydrationWarning>
+      <body className="antialiased min-h-screen">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('hanzi-theme')||'ink-jade';document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
+          }}
+        />
         {children}
       </body>
     </html>

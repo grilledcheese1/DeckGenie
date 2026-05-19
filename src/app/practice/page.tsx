@@ -14,12 +14,12 @@ function PracticeInner() {
   const searchParams  = useSearchParams()
   const startUnlock   = searchParams.get('unlock') === 'true'
 
-  const { progress, settings, vocabCount, incrementSentence, resetRoundCounter } = useProgress()
+  const { progress, settings, vocabCount, incrementSentence, resetRoundCounter, claimUnlock } = useProgress()
   const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer } = usePractice(settings?.strictness ?? 2)
 
-  const [showUnlock, setShowUnlock]         = useState(startUnlock)
+  const [showUnlock, setShowUnlock]               = useState(startUnlock)
   const [roundJustComplete, setRoundJustComplete] = useState(false)
-  const [sentenceNum, setSentenceNum]       = useState(1)
+  const [sentenceNum, setSentenceNum]             = useState(1)
   const cardWrapRef = useRef<HTMLDivElement>(null)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
@@ -27,12 +27,10 @@ function PracticeInner() {
   const wordsPerUnlock     = settings?.words_per_unlock ?? 5
   const currentHsk         = settings?.starting_hsk ?? 2
 
-  // Fetch first sentence on mount (skip if opening unlock flow directly)
   useEffect(() => {
     if (!startUnlock) fetchSentence()
   }, []) // eslint-disable-line
 
-  // Slide out current card then fetch next
   async function handleNext() {
     if (!cardWrapRef.current) { await fetchSentence(); return }
 
@@ -48,11 +46,7 @@ function PracticeInner() {
       // don't let a tracking failure block the next sentence
     }
 
-    // Check if we just hit the unlock threshold
-    if (
-      result?.roundComplete &&
-      result.roundsCompleted % roundsBeforeUnlock === 0
-    ) {
+    if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
       setRoundJustComplete(true)
       setShowUnlock(true)
       setSentenceNum(1)
@@ -69,7 +63,11 @@ function PracticeInner() {
   }
 
   async function handleDone() {
-    try { await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block nav */ }
+    let result
+    try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block nav */ }
+    if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
+      claimUnlock()
+    }
     try {
       await fetch('/api/words', {
         method: 'POST',
@@ -84,15 +82,19 @@ function PracticeInner() {
   }
 
   function handleUnlockComplete(words: CorpusWord[]) {
+    claimUnlock()
     setShowUnlock(false)
     setRoundJustComplete(false)
     setSentenceNum(1)
     resetRoundCounter()
-    fetchSentence()
+    if (startUnlock) {
+      router.push('/dashboard')
+    } else {
+      fetchSentence()
+    }
   }
 
-  // Active vocab zh list for unlock exclusion
-  const activeVocabZh: string[] = [] // populated from supabase in real use; passed via UnlockModal
+  const activeVocabZh: string[] = []
 
   return (
     <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto">
@@ -101,17 +103,23 @@ function PracticeInner() {
       <div className="flex items-center justify-between mb-8">
         <button
           onClick={() => router.push('/dashboard')}
-          className="text-stone-600 hover:text-stone-300 text-sm flex items-center gap-1.5 transition-colors"
+          className="text-sm flex items-center gap-1.5 transition-colors"
+          style={{ color: 'var(--text-tertiary)' }}
         >
           ← Dashboard
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-600">
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             {vocabCount} words
           </span>
           <button
             onClick={() => router.push('/settings')}
-            className="w-8 h-8 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-500 hover:text-stone-300 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover-border"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-tertiary)',
+            }}
             aria-label="Settings"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -125,19 +133,25 @@ function PracticeInner() {
       <div ref={cardWrapRef} className="flex-1">
         {state.status === 'loading' && (
           <div className="animate-pulse">
-            <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 mb-4">
+            <div
+              className="rounded-3xl p-6 mb-4"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
               <div className="flex items-center justify-between mb-6">
-                <div className="h-3 w-16 bg-stone-800 rounded-full" />
-                <div className="h-3 w-10 bg-stone-800 rounded-full" />
+                <div className="h-3 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                <div className="h-3 w-10 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
               </div>
               <div className="flex flex-col items-center gap-3 py-6">
-                <div className="h-10 w-40 bg-stone-800 rounded-xl" />
-                <div className="h-4 w-24 bg-stone-800/60 rounded-full" />
+                <div className="h-10 w-40 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                <div className="h-4 w-24 rounded-full opacity-60" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
               </div>
             </div>
-            <div className="bg-stone-900 border border-stone-800 rounded-3xl p-5">
-              <div className="h-3 w-32 bg-stone-800 rounded-full mb-4" />
-              <div className="h-12 bg-stone-800 rounded-xl" />
+            <div
+              className="rounded-3xl p-5"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
+              <div className="h-3 w-32 rounded-full mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+              <div className="h-12 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
             </div>
           </div>
         )}
@@ -160,20 +174,26 @@ function PracticeInner() {
         )}
       </div>
 
-      {/* Next sentence / Done button — shown after grading */}
+      {/* Next sentence / Done button */}
       {state.status === 'graded' && (
         <div className="mt-6 slide-up">
           {sentenceNum === sentencesPerRound ? (
             <button
               onClick={handleDone}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 active:scale-[0.98] text-white font-medium rounded-2xl py-4 text-sm transition-all"
+              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+              style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
             >
               Done! →
             </button>
           ) : (
             <button
               onClick={handleNext}
-              className="w-full bg-stone-900 hover:bg-stone-800 border border-stone-800 active:scale-[0.98] text-stone-200 font-medium rounded-2xl py-4 text-sm transition-all"
+              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+              }}
             >
               Next sentence →
             </button>
@@ -181,13 +201,13 @@ function PracticeInner() {
         </div>
       )}
 
-      {/* Unlock modal */}
       {showUnlock && (
         <UnlockModal
           wordsPerUnlock={wordsPerUnlock}
           currentHsk={currentHsk}
           activeVocab={activeVocabZh}
           onComplete={handleUnlockComplete}
+          completeCta={startUnlock ? 'Back to Dashboard →' : 'Keep practicing →'}
         />
       )}
     </div>
@@ -198,7 +218,10 @@ export default function PracticePage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <div
+          className="w-5 h-5 rounded-full animate-spin"
+          style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+        />
       </div>
     }>
       <PracticeInner />

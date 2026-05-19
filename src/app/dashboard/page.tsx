@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { progress, settings, vocabCount, loading } = useProgress()
+  const { progress, settings, vocabCount, loading, canUnlock } = useProgress()
   const {
     words, loading: vocabLoading, hasMore, filters,
     open: openVocab, loadMore, applyFilter, removeWord,
@@ -19,7 +19,6 @@ export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // GSAP staggered entrance
   useEffect(() => {
     if (loading || !containerRef.current) return
     const ctx = gsap.context(() => {
@@ -49,7 +48,10 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <div
+          className="w-5 h-5 rounded-full animate-spin"
+          style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+        />
       </div>
     )
   }
@@ -60,7 +62,6 @@ export default function DashboardPage() {
   const currentSentences   = progress?.current_round_sentences ?? 0
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsInCycle      = roundsCompleted % roundsBeforeUnlock
-  const canUnlock          = roundsCompleted > 0 && roundsCompleted % roundsBeforeUnlock === 0
 
   return (
     <div ref={containerRef} className="min-h-screen px-4 py-8 max-w-lg mx-auto">
@@ -68,14 +69,19 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="dash-card flex items-center justify-between mb-10">
         <div>
-          <p className="font-hanzi text-3xl text-emerald-400">汉字练习</p>
-          <p className="text-stone-500 text-xs mt-0.5">
+          <p className="font-hanzi text-3xl" style={{ color: 'var(--hanzi-color)' }}>汉字练习</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
             HSK {settings?.starting_hsk ?? 1} · {vocabCount} words active
           </p>
         </div>
         <button
           onClick={() => router.push('/settings')}
-          className="w-9 h-9 rounded-full bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-400 hover:text-stone-200 hover:border-stone-600 transition-all"
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover-border"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-tertiary)',
+          }}
           aria-label="Settings"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -92,27 +98,37 @@ export default function DashboardPage() {
           { label: 'Accuracy', value: `${progress?.rolling_accuracy ?? 0}%` },
           { label: 'Vocab',    value: vocabCount },
         ].map(({ label, value }) => (
-          <div key={label} className="bg-stone-900 rounded-2xl border border-stone-800 p-4">
-            <p className="text-2xl font-medium text-stone-100">{value}</p>
-            <p className="text-xs text-stone-500 mt-0.5">{label}</p>
+          <div
+            key={label}
+            className="rounded-2xl p-4"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{value}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</p>
           </div>
         ))}
       </div>
 
       {/* Round cycle progress */}
-      <div className="dash-card bg-stone-900 rounded-2xl border border-stone-800 p-5 mb-4">
+      <div
+        className="dash-card rounded-2xl p-5 mb-4"
+        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+      >
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm text-stone-300">Round {currentRound}</p>
-          <p className="text-xs text-stone-500">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Round {currentRound}</p>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             {currentSentences} / {sentencesPerRound} sentences
           </p>
         </div>
 
         {/* Sentence progress bar */}
-        <div className="w-full h-1.5 bg-stone-800 rounded-full mb-4 overflow-hidden">
+        <div
+          className="w-full h-1.5 rounded-full mb-4 overflow-hidden"
+          style={{ backgroundColor: 'var(--bg-tertiary)' }}
+        >
           <div
-            className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-            style={{ width: `${(currentSentences / sentencesPerRound) * 100}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${(currentSentences / sentencesPerRound) * 100}%`, backgroundColor: 'var(--accent)' }}
           />
         </div>
 
@@ -121,33 +137,39 @@ export default function DashboardPage() {
           {Array.from({ length: roundsBeforeUnlock }).map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                i < roundsInCycle
-                  ? 'bg-emerald-500'
-                  : i === roundsInCycle && currentSentences > 0
-                  ? 'bg-emerald-800'
-                  : 'bg-stone-800'
-              }`}
+              className="h-1.5 flex-1 rounded-full transition-all duration-300"
+              style={{
+                backgroundColor:
+                  i < roundsInCycle
+                    ? 'var(--accent)'
+                    : i === roundsInCycle && currentSentences > 0
+                    ? 'var(--accent-subtle)'
+                    : 'var(--bg-tertiary)',
+              }}
             />
           ))}
         </div>
-        <p className="text-xs text-stone-600 mt-2">
+        <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
           {roundsBeforeUnlock - roundsInCycle} round{roundsBeforeUnlock - roundsInCycle !== 1 ? 's' : ''} until +{settings?.words_per_unlock ?? 5} new words
         </p>
       </div>
 
       {/* Unlock banner */}
       {canUnlock && (
-        <div className="dash-card bg-emerald-950/50 border border-emerald-800/60 rounded-2xl p-4 mb-4 flex items-center justify-between">
+        <div
+          className="dash-card rounded-2xl p-4 mb-4 flex items-center justify-between"
+          style={{ backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent)' }}
+        >
           <div>
-            <p className="text-sm font-medium text-emerald-300">New words ready</p>
-            <p className="text-xs text-emerald-700 mt-0.5">
+            <p className="text-sm font-medium" style={{ color: 'var(--accent-text)' }}>New words ready</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--accent)' }}>
               You&#39;ve earned {settings?.words_per_unlock ?? 5} new words
             </p>
           </div>
           <button
             onClick={() => router.push('/practice?unlock=true')}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium rounded-xl transition-colors"
+            className="px-4 py-2 text-xs font-medium rounded-xl transition-colors hover-accent"
+            style={{ backgroundColor: 'var(--accent)', color: 'white' }}
           >
             Unlock →
           </button>
@@ -158,27 +180,33 @@ export default function DashboardPage() {
       <div className="dash-card space-y-3 mt-2">
         <button
           onClick={() => router.push('/practice')}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white font-medium rounded-2xl py-4 text-sm transition-all"
+          className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+          style={{ backgroundColor: 'var(--accent)', color: 'white' }}
         >
           {currentSentences > 0 ? 'Continue practice' : 'Start practice'}
         </button>
 
         <button
           onClick={handleOpenVocab}
-          className="w-full bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 font-medium rounded-2xl py-3.5 text-sm transition-all"
+          className="w-full font-medium rounded-2xl py-3.5 text-sm transition-all hover-bg"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+          }}
         >
           View vocab list
         </button>
 
         <button
           onClick={handleSignOut}
-          className="w-full text-stone-600 hover:text-stone-400 text-xs py-2 transition-colors"
+          className="w-full text-xs py-2 transition-colors"
+          style={{ color: 'var(--text-tertiary)' }}
         >
           Sign out
         </button>
       </div>
 
-      {/* Vocab sheet */}
       {sheetOpen && (
         <VocabSheet
           words={words}
@@ -192,7 +220,6 @@ export default function DashboardPage() {
           totalCount={vocabCount}
         />
       )}
-
     </div>
   )
 }

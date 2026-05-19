@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Settings } from '@/types'
+import { ThemePicker } from '@/components/ui/ThemePicker'
+import { loadSavedTheme, type ThemeId } from '@/lib/theme'
 
 const HSK_DESCRIPTIONS: Record<number, string> = {
   1: 'Complete beginner — ~150 basic words',
@@ -32,6 +34,7 @@ function SettingsInner() {
     show_pinyin: 'tap', show_hints: 'after',
   })
   const [saving, setSaving] = useState(false)
+  const [theme, setTheme] = useState<ThemeId>('ink-jade')
 
   const loadSettings = useCallback(async () => {
     try {
@@ -50,6 +53,7 @@ function SettingsInner() {
   }, [supabase])
 
   useEffect(() => { loadSettings() }, [loadSettings])
+  useEffect(() => { setTheme(loadSavedTheme()) }, [])
 
   async function handleSave() {
     setSaving(true)
@@ -76,88 +80,173 @@ function SettingsInner() {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
+  const selectedChip: React.CSSProperties = {
+    backgroundColor: 'var(--accent-subtle)',
+    border: '1px solid var(--accent)',
+    color: 'var(--accent-text)',
+  }
+  const unselectedChip: React.CSSProperties = {
+    backgroundColor: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-tertiary)',
+  }
+
   return (
     <div className="min-h-screen px-4 py-10 max-w-lg mx-auto">
       <div className="mb-10">
         {!isFirstRun && (
-          <button onClick={() => router.back()} className="text-stone-500 hover:text-stone-300 text-sm mb-6 flex items-center gap-1.5 transition-colors">
+          <button
+            onClick={() => router.back()}
+            className="text-sm mb-6 flex items-center gap-1.5 transition-colors"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
             ← Back
           </button>
         )}
-        <h1 className="text-2xl font-medium">
-          {isFirstRun ? <span>Welcome to <span className="font-hanzi text-emerald-400">汉字练习</span></span> : 'Settings'}
+        <h1 className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
+          {isFirstRun
+            ? <span>Welcome to <span className="font-hanzi" style={{ color: 'var(--hanzi-color)' }}>汉字练习</span></span>
+            : 'Settings'}
         </h1>
-        {isFirstRun && <p className="text-stone-400 text-sm mt-1">Tell us where you want to start — you can change this any time.</p>}
+        {isFirstRun && (
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Tell us where you want to start — you can change this any time.
+          </p>
+        )}
       </div>
+
       <div className="space-y-8">
+        {/* HSK level */}
         <section>
-          <h2 className="text-xs uppercase tracking-widest text-stone-500 mb-4">{isFirstRun ? 'Starting level' : 'HSK level'}</h2>
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            {isFirstRun ? 'Starting level' : 'HSK level'}
+          </h2>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {[1,2,3,4,5,6].map(level => (
-              <button key={level} onClick={() => update('starting_hsk', level as Settings['starting_hsk'])}
-                className={`rounded-xl py-3 text-center text-sm font-medium border transition-all ${settings.starting_hsk === level ? 'bg-emerald-900/60 border-emerald-600 text-emerald-300' : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-600'}`}>
+              <button
+                key={level}
+                onClick={() => update('starting_hsk', level as Settings['starting_hsk'])}
+                className="rounded-xl py-3 text-center text-sm font-medium transition-all hover-border"
+                style={settings.starting_hsk === level ? selectedChip : unselectedChip}
+              >
                 HSK {level}
               </button>
             ))}
           </div>
-          <p className="text-xs text-stone-500 mt-2">{HSK_DESCRIPTIONS[settings.starting_hsk ?? 2]}</p>
+          <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+            {HSK_DESCRIPTIONS[settings.starting_hsk ?? 2]}
+          </p>
         </section>
+
+        {/* Grading strictness */}
         <section>
-          <h2 className="text-xs uppercase tracking-widest text-stone-500 mb-4">Grading strictness</h2>
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            Grading strictness
+          </h2>
           <div className="grid grid-cols-3 gap-2">
             {[1,2,3].map(level => {
               const s = STRICTNESS_LABELS[level]
+              const isSelected = settings.strictness === level
               return (
-                <button key={level} onClick={() => update('strictness', level as Settings['strictness'])}
-                  className={`rounded-xl p-3 text-left border transition-all ${settings.strictness === level ? 'bg-emerald-900/60 border-emerald-600' : 'bg-stone-900 border-stone-800 hover:border-stone-600'}`}>
-                  <p className={`text-sm font-medium ${settings.strictness === level ? 'text-emerald-300' : 'text-stone-300'}`}>{s.label}</p>
-                  <p className="text-xs text-stone-500 mt-0.5 leading-tight">{s.desc}</p>
+                <button
+                  key={level}
+                  onClick={() => update('strictness', level as Settings['strictness'])}
+                  className="rounded-xl p-3 text-left transition-all hover-border"
+                  style={isSelected ? selectedChip : unselectedChip}
+                >
+                  <p className="text-sm font-medium" style={{ color: isSelected ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                    {s.label}
+                  </p>
+                  <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-tertiary)' }}>
+                    {s.desc}
+                  </p>
                 </button>
               )
             })}
           </div>
         </section>
+
+        {/* Session */}
         <section>
-          <h2 className="text-xs uppercase tracking-widest text-stone-500 mb-4">Session</h2>
-          <div className="space-y-1 bg-stone-900 rounded-2xl border border-stone-800 overflow-hidden">
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            Session
+          </h2>
+          <div
+            className="space-y-1 rounded-2xl overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          >
             {[
-              { label: 'Sentences per round', key: 'sentences_per_round' as const, min: 5, max: 20 },
+              { label: 'Sentences per round', key: 'sentences_per_round' as const, min: 5,  max: 20 },
               { label: 'Rounds before unlock', key: 'rounds_before_unlock' as const, min: 1, max: 10 },
-              { label: 'New words per unlock', key: 'words_per_unlock' as const, min: 1, max: 10 },
+              { label: 'New words per unlock',  key: 'words_per_unlock' as const,   min: 1, max: 10 },
             ].map(({ label, key, min, max }, i, arr) => (
-              <div key={key} className={`flex items-center justify-between px-4 py-3.5 ${i < arr.length - 1 ? 'border-b border-stone-800' : ''}`}>
-                <span className="text-sm text-stone-300">{label}</span>
+              <div
+                key={key}
+                className="flex items-center justify-between px-4 py-3.5"
+                style={i < arr.length - 1 ? { borderBottom: '1px solid var(--border)' } : {}}
+              >
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => update(key, Math.max(min, (settings[key] as number) - 1) as never)}
-                    className="w-7 h-7 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm flex items-center justify-center transition-colors">−</button>
-                  <span className="w-6 text-center text-sm font-medium text-stone-100">{settings[key] as number}</span>
-                  <button onClick={() => update(key, Math.min(max, (settings[key] as number) + 1) as never)}
-                    className="w-7 h-7 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm flex items-center justify-center transition-colors">+</button>
+                  <button
+                    onClick={() => update(key, Math.max(min, (settings[key] as number) - 1) as never)}
+                    className="w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-colors hover-bg"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {settings[key] as number}
+                  </span>
+                  <button
+                    onClick={() => update(key, Math.min(max, (settings[key] as number) + 1) as never)}
+                    className="w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-colors hover-bg"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </section>
+
+        {/* Display */}
         <section>
-          <h2 className="text-xs uppercase tracking-widest text-stone-500 mb-4">Display</h2>
-          <div className="space-y-1 bg-stone-900 rounded-2xl border border-stone-800 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-800">
-              <span className="text-sm text-stone-300">Show pinyin</span>
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            Display
+          </h2>
+          <div
+            className="space-y-1 rounded-2xl overflow-hidden"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="flex items-center justify-between px-4 py-3.5"
+              style={{ borderBottom: '1px solid var(--border)' }}
+            >
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show pinyin</span>
               <div className="flex gap-1">
                 {(['always','tap','never'] as const).map(v => (
-                  <button key={v} onClick={() => update('show_pinyin', v)}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${settings.show_pinyin === v ? 'bg-emerald-900/70 text-emerald-300 border border-emerald-700' : 'bg-stone-800 text-stone-400 border border-transparent hover:border-stone-700'}`}>
+                  <button
+                    key={v}
+                    onClick={() => update('show_pinyin', v)}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize"
+                    style={settings.show_pinyin === v ? selectedChip : { ...unselectedChip, border: '1px solid transparent' }}
+                  >
                     {v}
                   </button>
                 ))}
               </div>
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-sm text-stone-300">Show vocab hints</span>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show vocab hints</span>
               <div className="flex gap-1">
                 {(['before','after','never'] as const).map(v => (
-                  <button key={v} onClick={() => update('show_hints', v)}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${settings.show_hints === v ? 'bg-emerald-900/70 text-emerald-300 border border-emerald-700' : 'bg-stone-800 text-stone-400 border border-transparent hover:border-stone-700'}`}>
+                  <button
+                    key={v}
+                    onClick={() => update('show_hints', v)}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize"
+                    style={settings.show_hints === v ? selectedChip : { ...unselectedChip, border: '1px solid transparent' }}
+                  >
                     {v}
                   </button>
                 ))}
@@ -165,11 +254,32 @@ function SettingsInner() {
             </div>
           </div>
         </section>
+
+        {/* Theme */}
+        <section>
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            Theme
+          </h2>
+          <ThemePicker selected={theme} onChange={setTheme} />
+        </section>
       </div>
+
       <div className="mt-10">
-        <button onClick={handleSave} disabled={saving}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium rounded-xl py-3.5 text-sm transition-colors">
-          {saving ? 'Saving…' : isFirstRun ? 'Start practicing →' : 'Save settings'}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full disabled:opacity-50 font-medium rounded-xl py-3.5 text-sm transition-colors hover-accent"
+          style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+        >
+          {saving
+            ? <span className="flex items-center justify-center gap-2">
+                <span
+                  className="w-4 h-4 rounded-full animate-spin"
+                  style={{ border: '2px solid white', borderTopColor: 'transparent' }}
+                />
+                Saving…
+              </span>
+            : isFirstRun ? 'Start practicing →' : 'Save settings'}
         </button>
       </div>
     </div>
@@ -180,7 +290,10 @@ export default function SettingsPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <div
+          className="w-5 h-5 rounded-full animate-spin"
+          style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+        />
       </div>
     }>
       <SettingsInner />

@@ -27,7 +27,6 @@ export function SentenceCard({
   const cardRef  = useRef<HTMLDivElement>(null)
   const gradeRef = useRef<HTMLDivElement>(null)
 
-  // Slide-up entrance on each new sentence
   useEffect(() => {
     if (!cardRef.current) return
     gsap.fromTo(cardRef.current,
@@ -36,7 +35,6 @@ export function SentenceCard({
     )
   }, [sentence.sentence_zh])
 
-  // Grade pop-in
   useEffect(() => {
     if (status !== 'graded' || !gradeRef.current) return
     gsap.fromTo(gradeRef.current,
@@ -59,34 +57,46 @@ export function SentenceCard({
     <div ref={cardRef} className="w-full">
 
       {/* Progress bar */}
-      <div className="w-full h-0.5 bg-stone-800 rounded-full mb-6 overflow-hidden">
+      <div
+        className="w-full h-0.5 rounded-full mb-6 overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-tertiary)' }}
+      >
         <div
-          className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-          style={{ width: `${(sentenceNumber / totalSentences) * 100}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${(sentenceNumber / totalSentences) * 100}%`,
+            backgroundColor: 'var(--accent)',
+          }}
         />
       </div>
 
       {/* Sentence number */}
-      <p className="text-xs text-stone-600 mb-5">{sentenceNumber} / {totalSentences}</p>
+      <p className="text-xs mb-5" style={{ color: 'var(--text-tertiary)' }}>
+        {sentenceNumber} / {totalSentences}
+      </p>
 
       {/* Hanzi */}
       <div className="mb-3">
-        <p className="font-hanzi text-4xl leading-tight text-stone-100 tracking-wide">
+        <p className="font-hanzi text-4xl leading-tight tracking-wide" style={{ color: 'var(--text-primary)' }}>
           {sentence.sentence_zh}
         </p>
       </div>
 
-      {/* Pinyin — tap to reveal */}
+      {/* Pinyin */}
       {showPinyinSetting !== 'never' && (
         <div className="mb-6 min-h-[24px]">
           {pinyinVisible ? (
-            <p className="text-stone-400 text-sm pinyin-reveal">
+            <p className="text-sm pinyin-reveal" style={{ color: 'var(--text-secondary)' }}>
               {sentence.sentence_py}
             </p>
           ) : (
             <button
               onClick={onTogglePinyin}
-              className="text-xs text-stone-700 hover:text-stone-500 border border-stone-800 hover:border-stone-700 rounded-lg px-3 py-1 transition-all"
+              className="text-xs rounded-lg px-3 py-1 transition-all hover-border"
+              style={{
+                color: 'var(--text-tertiary)',
+                border: '1px solid var(--border)',
+              }}
             >
               Show pinyin
             </button>
@@ -100,7 +110,12 @@ export function SentenceCard({
           {sentence.vocab_used.map(zh => (
             <span
               key={zh}
-              className="text-xs bg-stone-900 border border-stone-800 text-stone-400 rounded-lg px-2.5 py-1 font-hanzi"
+              className="text-xs rounded-lg px-2.5 py-1 font-hanzi"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+              }}
             >
               {zh}
             </span>
@@ -123,16 +138,27 @@ export function SentenceCard({
             placeholder="Type your English translation…"
             rows={2}
             disabled={isSubmitting}
-            className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-sm text-stone-100 placeholder-stone-700 resize-none disabled:opacity-50 transition-all"
+            className="w-full rounded-xl px-4 py-3 text-sm resize-none disabled:opacity-50 transition-all focus:outline-none"
+            style={{
+              backgroundColor: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
+              color: 'var(--text-primary)',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--input-focus)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'var(--input-border)')}
           />
           <button
             onClick={onSubmit}
             disabled={!userAnswer.trim() || isSubmitting}
-            className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white font-medium rounded-xl py-3 text-sm transition-all"
+            className="w-full disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] font-medium rounded-xl py-3 text-sm transition-all hover-accent"
+            style={{ backgroundColor: 'var(--accent)', color: 'white' }}
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                <span
+                  className="w-3.5 h-3.5 rounded-full animate-spin"
+                  style={{ border: '2px solid white', borderTopColor: 'transparent' }}
+                />
                 Grading…
               </span>
             ) : 'Submit'}
@@ -143,25 +169,34 @@ export function SentenceCard({
       {/* Grade result */}
       {status === 'graded' && grade && (
         <div ref={gradeRef} className="space-y-3">
-          {/* Score banner */}
-          <div className={`rounded-xl px-4 py-3 border ${
-            grade.correct
-              ? 'bg-emerald-950/50 border-emerald-800/60'
-              : 'bg-red-950/30 border-red-900/40'
-          }`}>
+          <div
+            className="rounded-xl px-4 py-3"
+            style={grade.correct ? {
+              backgroundColor: 'var(--accent-subtle)',
+              border: '1px solid var(--accent)',
+            } : {
+              backgroundColor: 'var(--error-bg)',
+              border: '1px solid var(--error-border)',
+            }}
+          >
             <div className="flex items-center justify-between mb-1">
-              <span className={`text-sm font-medium ${grade.correct ? 'text-emerald-300' : 'text-red-400'}`}>
+              <span
+                className="text-sm font-medium"
+                style={{ color: grade.correct ? 'var(--accent-text)' : 'var(--error-text)' }}
+              >
                 {grade.correct ? '✓ Correct' : '✗ Incorrect'} · {grade.score}/100
               </span>
             </div>
-            <p className="text-xs text-stone-400">{grade.feedback}</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{grade.feedback}</p>
           </div>
 
-          {/* Correct answer */}
           {!grade.correct && (
-            <div className="bg-stone-900 border border-stone-800 rounded-xl px-4 py-3">
-              <p className="text-xs text-stone-600 mb-1">Correct answer</p>
-              <p className="text-sm text-stone-200">{grade.correct_answer}</p>
+            <div
+              className="rounded-xl px-4 py-3"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
+              <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Correct answer</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{grade.correct_answer}</p>
             </div>
           )}
         </div>

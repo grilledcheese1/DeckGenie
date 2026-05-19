@@ -10,14 +10,15 @@ interface Props {
   currentHsk: number
   activeVocab: string[]
   onComplete: (words: CorpusWord[]) => void
+  completeCta?: string
 }
 
 const POS_OPTIONS = ['any', 'noun', 'verb', 'adjective', 'adverb']
 
-export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplete }: Props) {
-  const overlayRef  = useRef<HTMLDivElement>(null)
-  const panelRef    = useRef<HTMLDivElement>(null)
-  const wordsRef    = useRef<HTMLDivElement>(null)
+export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplete, completeCta = 'Keep practicing →' }: Props) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const panelRef   = useRef<HTMLDivElement>(null)
+  const wordsRef   = useRef<HTMLDivElement>(null)
 
   const [pos, setPos]     = useState('any')
   const [topic, setTopic] = useState('any')
@@ -25,7 +26,6 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
   const [words, setWords] = useState<CorpusWord[]>([])
   const [step, setStep]   = useState<'filters' | 'loading' | 'reveal'>('filters')
 
-  // Entrance animation
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.fromTo(overlayRef.current,
@@ -40,7 +40,6 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
     return () => ctx.revert()
   }, [])
 
-  // Word-by-word reveal animation
   useEffect(() => {
     if (step !== 'reveal' || !wordsRef.current) return
     const ctx = gsap.context(() => {
@@ -72,6 +71,17 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
 
   const topics = ['any', ...CORPUS_TOPICS]
 
+  const selectedPill: React.CSSProperties = {
+    backgroundColor: 'var(--accent-subtle)',
+    border: '1px solid var(--accent)',
+    color: 'var(--accent-text)',
+  }
+  const unselectedPill: React.CSSProperties = {
+    backgroundColor: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-secondary)',
+  }
+
   return (
     <div
       ref={overlayRef}
@@ -80,31 +90,34 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
     >
       <div
         ref={panelRef}
-        className="w-full max-w-sm bg-stone-950 border border-stone-800 rounded-3xl p-6"
+        className="w-full max-w-sm rounded-3xl p-6"
+        style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
       >
         {/* Filters step */}
         {step === 'filters' && (
           <>
             <div className="mb-6">
-              <p className="text-lg font-medium text-stone-100">
+              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                 +{wordsPerUnlock} new words
               </p>
-              <p className="text-xs text-stone-500 mt-1">
+              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
                 Filter by type or topic, or let us pick
               </p>
             </div>
 
             {/* Part of speech */}
             <div className="mb-4">
-              <p className="text-xs uppercase tracking-widest text-stone-600 mb-2">Part of speech</p>
+              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                Part of speech
+              </p>
               <div className="flex flex-wrap gap-2">
                 {POS_OPTIONS.map(p => (
-                  <button key={p} onClick={() => setPos(p)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border capitalize transition-all ${
-                      pos === p
-                        ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300'
-                        : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-600'
-                    }`}>
+                  <button
+                    key={p}
+                    onClick={() => setPos(p)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium capitalize transition-all hover-border"
+                    style={pos === p ? selectedPill : unselectedPill}
+                  >
                     {p}
                   </button>
                 ))}
@@ -113,15 +126,17 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
 
             {/* Topic */}
             <div className="mb-4">
-              <p className="text-xs uppercase tracking-widest text-stone-600 mb-2">Topic</p>
+              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                Topic
+              </p>
               <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
                 {topics.map(t => (
-                  <button key={t} onClick={() => setTopic(t)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border capitalize transition-all ${
-                      topic === t
-                        ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300'
-                        : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-600'
-                    }`}>
+                  <button
+                    key={t}
+                    onClick={() => setTopic(t)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium capitalize transition-all hover-border"
+                    style={topic === t ? selectedPill : unselectedPill}
+                  >
                     {t}
                   </button>
                 ))}
@@ -130,23 +145,28 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
 
             {/* HSK level */}
             <div className="mb-6">
-              <p className="text-xs uppercase tracking-widest text-stone-600 mb-2">Up to HSK level</p>
+              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                Up to HSK level
+              </p>
               <div className="flex gap-2">
                 {[1,2,3,4,5,6].map(l => (
-                  <button key={l} onClick={() => setHsk(l)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
-                      hsk === l
-                        ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300'
-                        : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-600'
-                    }`}>
+                  <button
+                    key={l}
+                    onClick={() => setHsk(l)}
+                    className="flex-1 py-2 rounded-xl text-xs font-medium transition-all hover-border"
+                    style={hsk === l ? selectedPill : unselectedPill}
+                  >
                     {l}
                   </button>
                 ))}
               </div>
             </div>
 
-            <button onClick={handleGenerate}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white font-medium rounded-2xl py-3.5 text-sm transition-all">
+            <button
+              onClick={handleGenerate}
+              className="w-full active:scale-[0.98] font-medium rounded-2xl py-3.5 text-sm transition-all hover-accent"
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+            >
               Generate my words →
             </button>
           </>
@@ -155,28 +175,38 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
         {/* Loading step */}
         {step === 'loading' && (
           <div className="flex flex-col items-center justify-center py-10 gap-4">
-            <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-            <p className="text-sm text-stone-500">Finding your words…</p>
+            <div
+              className="w-6 h-6 rounded-full animate-spin"
+              style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+            />
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Finding your words…</p>
           </div>
         )}
 
         {/* Reveal step */}
         {step === 'reveal' && (
           <>
-            <p className="text-lg font-medium text-stone-100 mb-1">Your new words</p>
-            <p className="text-xs text-stone-500 mb-6">Added to your active vocab</p>
+            <p className="text-lg font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Your new words</p>
+            <p className="text-xs mb-6" style={{ color: 'var(--text-tertiary)' }}>Added to your active vocab</p>
 
             <div ref={wordsRef} className="space-y-2 mb-6">
               {words.map(word => (
-                <div key={word.zh} className="unlock-word flex items-center justify-between bg-stone-900 border border-stone-800 rounded-2xl px-4 py-3">
+                <div
+                  key={word.zh}
+                  className="unlock-word flex items-center justify-between rounded-2xl px-4 py-3"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+                >
                   <div className="flex items-center gap-3">
-                    <span className="font-hanzi text-xl text-stone-100">{word.zh}</span>
+                    <span className="font-hanzi text-xl" style={{ color: 'var(--text-primary)' }}>{word.zh}</span>
                     <div>
-                      <p className="text-xs text-stone-400">{word.py}</p>
-                      <p className="text-xs text-stone-600">{word.en}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{word.py}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{word.en}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-stone-700 bg-stone-800 rounded-lg px-2 py-0.5 capitalize">
+                  <span
+                    className="text-xs rounded-lg px-2 py-0.5 capitalize"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}
+                  >
                     {word.pos}
                   </span>
                 </div>
@@ -185,9 +215,10 @@ export function UnlockModal({ wordsPerUnlock, currentHsk, activeVocab, onComplet
 
             <button
               onClick={() => onComplete(words)}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white font-medium rounded-2xl py-3.5 text-sm transition-all"
+              className="w-full active:scale-[0.98] font-medium rounded-2xl py-3.5 text-sm transition-all hover-accent"
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
             >
-              Keep practicing →
+              {completeCta}
             </button>
           </>
         )}

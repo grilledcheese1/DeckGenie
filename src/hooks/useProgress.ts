@@ -6,6 +6,7 @@ import type { Progress, Settings } from '@/types'
 
 const PROGRESS_KEY = 'hanzi_progress'
 const SETTINGS_KEY = 'hanzi_settings'
+const UNLOCK_CLAIMED_KEY = 'hanzi_unlock_claimed'
 
 function readLocal<T>(key: string): T | null {
   if (typeof window === 'undefined') return null
@@ -38,6 +39,9 @@ export function useProgress() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [vocabCount, setVocabCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [lastClaimedRound, setLastClaimedRound] = useState<number>(() =>
+    readLocal<number>(UNLOCK_CLAIMED_KEY) ?? 0
+  )
 
   const load = useCallback(async () => {
     try {
@@ -117,6 +121,12 @@ export function useProgress() {
     return { roundComplete, roundsCompleted: newRoundsCompleted }
   }
 
+  function claimUnlock() {
+    const r = progress?.rounds_completed ?? 0
+    setLastClaimedRound(r)
+    writeLocal(UNLOCK_CLAIMED_KEY, r)
+  }
+
   async function resetRoundCounter() {
     const patch: Partial<Progress> = { current_round_number: 1, current_round_sentences: 0 }
     setProgress(prev => {
@@ -131,5 +141,11 @@ export function useProgress() {
     } catch {}
   }
 
-  return { progress, settings, vocabCount, loading, reload: load, incrementSentence, resetRoundCounter }
+  const roundsCompleted    = progress?.rounds_completed ?? 0
+  const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
+  const canUnlock = roundsCompleted > 0
+    && roundsCompleted % roundsBeforeUnlock === 0
+    && roundsCompleted > lastClaimedRound
+
+  return { progress, settings, vocabCount, loading, reload: load, incrementSentence, resetRoundCounter, claimUnlock, canUnlock }
 }
