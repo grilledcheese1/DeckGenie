@@ -17,8 +17,9 @@ interface ActiveSegment {
 }
 
 export function AnalysisSentence({ sentence, vocabList }: Props) {
-  const [active, setActive]       = useState<ActiveSegment | null>(null)
-  const [showSheet, setShowSheet] = useState(false)
+  const [active, setActive]           = useState<ActiveSegment | null>(null)
+  const [showSheet, setShowSheet]     = useState(false)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   const segments = segmentSentence(sentence.sentence_zh, sentence.vocab_used)
 
@@ -71,9 +72,10 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
             )
           }
 
-          const info     = getInfoForSegment(seg)
-          const isActive = active?.index === i
-          const isDimmed = active !== null && !isActive
+          const info      = getInfoForSegment(seg)
+          const isActive  = active?.index === i
+          const isDimmed  = active !== null && !isActive
+          const isHovered = hoveredIndex === i && !isActive
 
           return (
             <span
@@ -86,6 +88,8 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                 opacity: isDimmed ? 0.28 : 1,
                 transition: 'opacity 0.2s',
               }}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
               onClick={() => {
                 if (isActive) {
                   setActive(null)
@@ -128,7 +132,11 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                   color: 'var(--text-primary)',
                   display: 'inline-block',
                   filter: isActive ? 'brightness(1.5)' : 'none',
-                  background: isActive ? 'var(--char-highlight)' : 'transparent',
+                  background: isActive
+                    ? 'var(--char-highlight)'
+                    : isHovered
+                      ? 'var(--char-hover-bg)'
+                      : 'transparent',
                   borderRadius: '4px',
                   padding: '0 2px',
                   transform: isActive ? 'scale(1.08)' : 'scale(1)',

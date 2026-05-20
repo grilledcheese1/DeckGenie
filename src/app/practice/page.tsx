@@ -66,7 +66,19 @@ function PracticeInner() {
   }, [state.status, state.grade])
 
   async function handleNext() {
-    if (!cardWrapRef.current) { await fetchSentence(); return }
+    if (!cardWrapRef.current) {
+      let result
+      try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block */ }
+      if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
+        setRoundJustComplete(true)
+        setShowUnlock(true)
+        setSentenceNum(1)
+        return
+      }
+      setSentenceNum(prev => prev >= sentencesPerRound ? 1 : prev + 1)
+      await fetchSentence()
+      return
+    }
 
     await gsap.to(cardWrapRef.current, {
       opacity: 0, x: -32, duration: 0.25, ease: 'power2.in'
@@ -193,12 +205,12 @@ function PracticeInner() {
           </button>
         </div>
 
-        <p className="text-xs mb-6" style={{ color: 'var(--text-tertiary)' }}>
+        <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
           Tap any character to inspect
         </p>
 
-        {/* Annotated sentence */}
-        <div className="mb-8">
+        {/* Annotated sentence — mt-16 keeps tooltip above the viewport top */}
+        <div className="mt-16 mb-8">
           <AnalysisSentence
             sentence={state.sentence}
             vocabList={vocabList}
