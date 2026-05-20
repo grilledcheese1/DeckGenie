@@ -1,8 +1,53 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import type { GenerateResponse, GradeResponse } from '@/types'
+
+function SpeakerButton({ text }: { text: string }) {
+  const [speaking, setSpeaking] = useState(false)
+
+  function speak() {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utt = new SpeechSynthesisUtterance(text)
+    utt.lang = 'zh-CN'
+    utt.rate = 0.85
+    utt.onstart = () => setSpeaking(true)
+    utt.onend   = () => setSpeaking(false)
+    utt.onerror = () => setSpeaking(false)
+    window.speechSynthesis.speak(utt)
+  }
+
+  return (
+    <button
+      onClick={speak}
+      disabled={speaking}
+      aria-label="Listen to pronunciation"
+      className="flex-shrink-0 mt-2 w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
+      style={{
+        background: speaking ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+        border: `0.5px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`,
+        color: speaking ? 'var(--accent-text)' : 'var(--text-tertiary)',
+      }}
+    >
+      {speaking ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      )}
+    </button>
+  )
+}
 
 interface Props {
   sentence: GenerateResponse
@@ -17,12 +62,13 @@ interface Props {
   showHints: 'before' | 'after' | 'never'
   sentenceNumber: number
   totalSentences: number
+  difficulty?: { label: string; color: string; bg: string; border: string }
 }
 
 export function SentenceCard({
   sentence, pinyinMode, showPinyinSetting, onTogglePinyin,
   userAnswer, onAnswerChange, onSubmit, grade, status,
-  showHints, sentenceNumber, totalSentences,
+  showHints, sentenceNumber, totalSentences, difficulty,
 }: Props) {
   const cardRef  = useRef<HTMLDivElement>(null)
   const gradeRef = useRef<HTMLDivElement>(null)
@@ -58,28 +104,50 @@ export function SentenceCard({
 
       {/* Progress bar */}
       <div
-        className="w-full h-0.5 rounded-full mb-6 overflow-hidden"
-        style={{ backgroundColor: 'var(--bg-tertiary)' }}
+        className="w-full rounded-full mb-6 overflow-hidden"
+        style={{ height: '6px', background: 'var(--bg-tertiary)' }}
       >
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
             width: `${(sentenceNumber / totalSentences) * 100}%`,
-            backgroundColor: 'var(--accent)',
+            background: 'var(--accent)',
           }}
         />
       </div>
 
-      {/* Sentence number */}
-      <p className="text-xs mb-5" style={{ color: 'var(--text-tertiary)' }}>
-        {sentenceNumber} / {totalSentences}
-      </p>
+      {/* Sentence number + difficulty badge */}
+      <div className="flex items-center justify-between mb-5">
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          {sentenceNumber} / {totalSentences}
+        </p>
+        {difficulty && (
+          <span
+            className="text-xs font-medium px-2 py-0.5 rounded-lg"
+            style={{
+              color: difficulty.color,
+              background: difficulty.bg,
+              border: `0.5px solid ${difficulty.border}`,
+            }}
+          >
+            {difficulty.label}
+          </span>
+        )}
+      </div>
 
-      {/* Hanzi */}
-      <div className="mb-3">
-        <p className="font-hanzi text-4xl leading-tight tracking-wide" style={{ color: 'var(--text-primary)' }}>
+      {/* Hanzi + speaker button */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p
+          className="font-hanzi leading-tight tracking-wide flex-1"
+          style={{
+            fontSize: 'clamp(2rem, 8vw, 3.2rem)',
+            color: 'var(--text-primary)',
+            lineHeight: 1.25,
+          }}
+        >
           {sentence.sentence_zh}
         </p>
+        <SpeakerButton text={sentence.sentence_zh} />
       </div>
 
       {/* Pinyin */}
@@ -147,6 +215,12 @@ export function SentenceCard({
             onFocus={e => (e.currentTarget.style.borderColor = 'var(--input-focus)')}
             onBlur={e => (e.currentTarget.style.borderColor = 'var(--input-border)')}
           />
+          <p
+            className="text-xs text-right hidden sm:block"
+            style={{ color: 'var(--text-tertiary)', marginTop: '-4px' }}
+          >
+            ↵ Enter to submit
+          </p>
           <button
             onClick={onSubmit}
             disabled={!userAnswer.trim() || isSubmitting}
