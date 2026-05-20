@@ -114,7 +114,7 @@ export function StreakFlame({ streak }: Props) {
     }
   }, [streak])
 
-  if (streak < 2) return null
+  if (streak < 2 && streak !== 0) return null
 
   return (
     <div
@@ -126,7 +126,7 @@ export function StreakFlame({ streak }: Props) {
       }}
     >
       <div
-        className="relative flex-shrink-0"
+        className="relative shrink-0"
         style={{ width: '28px', height: '18px' }}
       >
         <Image

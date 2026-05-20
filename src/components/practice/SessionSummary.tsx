@@ -37,12 +37,15 @@ export function SessionSummary({ summary, onReview, onDashboard }: Props) {
   return (
     <div
       ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="session-summary-title"
       className="fixed inset-0 z-50 flex flex-col px-4 py-8 max-w-lg mx-auto overflow-y-auto"
       style={{ background: 'var(--bg-primary)' }}
     >
       {/* Header */}
       <div className="mb-10 mt-4">
-        <p className="font-hanzi text-3xl mb-1" style={{ color: 'var(--hanzi-color)' }}>
+        <p id="session-summary-title" className="font-hanzi text-3xl mb-1" style={{ color: 'var(--hanzi-color)' }}>
           轮次完成
         </p>
         <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>

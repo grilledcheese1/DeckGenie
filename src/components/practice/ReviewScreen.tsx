@@ -10,7 +10,8 @@ interface Props {
 }
 
 export function ReviewScreen({ wrongAnswers, onDone }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const isExitingRef  = useRef(false)
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -29,6 +30,9 @@ export function ReviewScreen({ wrongAnswers, onDone }: Props) {
   }, [])
 
   function handleDone() {
+    if (isExitingRef.current) return
+    isExitingRef.current = true
+    gsap.killTweensOf(containerRef.current)
     gsap.to(containerRef.current, {
       x: '100%',
       opacity: 0,

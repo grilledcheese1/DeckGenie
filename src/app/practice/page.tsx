@@ -38,7 +38,8 @@ function PracticeInner() {
   const [showSummary,   setShowSummary]           = useState(false)
   const [showReview,    setShowReview]            = useState(false)
 
-  const cardWrapRef = useRef<HTMLDivElement>(null)
+  const cardWrapRef    = useRef<HTMLDivElement>(null)
+  const navigatingRef  = useRef(false)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -109,8 +110,10 @@ function PracticeInner() {
   }
 
   async function goToDashboard() {
+    if (navigatingRef.current) return
+    navigatingRef.current = true
     try {
-      await fetch('/api/words', {
+      const res = await fetch('/api/words', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +121,12 @@ function PracticeInner() {
           count:     settings?.words_per_unlock ?? 5,
         }),
       })
-    } catch { /* non-blocking */ }
+      if (!res.ok) console.error('Word unlock failed:', res.status, await res.text())
+    } catch (err) {
+      console.error('Word unlock error:', err)
+    } finally {
+      navigatingRef.current = false
+    }
     router.push('/dashboard')
   }
 

@@ -11,10 +11,12 @@ export async function POST(req: NextRequest) {
   const body: WordsRequest = await req.json()
   const { pos, topic, hsk_level, exclude_zh = [], count = 5 } = body
 
-  const [{ data: settings }, { data: existing }] = await Promise.all([
+  const [{ data: settings }, { data: existing, error: existingError }] = await Promise.all([
     supabase.from('settings').select('starting_hsk').eq('user_id', user.id).single(),
     supabase.from('vocab_list').select('word_zh').eq('user_id', user.id),
   ])
+
+  if (existingError) return NextResponse.json({ error: 'Failed to read vocabulary' }, { status: 500 })
 
   const ownedZh = (existing ?? []).map(r => r.word_zh)
   const allExcluded = Array.from(new Set([...exclude_zh, ...ownedZh]))
