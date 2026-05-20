@@ -11,13 +11,18 @@ export async function POST(req: NextRequest) {
   const body: WordsRequest = await req.json()
   const { pos, topic, hsk_level, exclude_zh = [], count = 5 } = body
 
-  const { data: settings } = await supabase
-    .from('settings').select('starting_hsk').eq('user_id', user.id).single()
+  const [{ data: settings }, { data: existing }] = await Promise.all([
+    supabase.from('settings').select('starting_hsk').eq('user_id', user.id).single(),
+    supabase.from('vocab_list').select('word_zh').eq('user_id', user.id),
+  ])
+
+  const ownedZh = (existing ?? []).map(r => r.word_zh)
+  const allExcluded = Array.from(new Set([...exclude_zh, ...ownedZh]))
 
   const maxHsk = hsk_level ?? (settings?.starting_hsk ?? 2)
-  let candidates = getCorpusForHsk(maxHsk, exclude_zh)
+  let candidates = getCorpusForHsk(maxHsk, allExcluded)
   candidates = filterCorpus(candidates, { pos, topic })
-  if (candidates.length === 0) candidates = getCorpusForHsk(maxHsk, exclude_zh)
+  if (candidates.length === 0) candidates = getCorpusForHsk(maxHsk, allExcluded)
 
   const weighted = candidates.flatMap(w => Array(7 - w.hsk).fill(w))
   const shuffled = weighted.sort(() => Math.random() - 0.5)
