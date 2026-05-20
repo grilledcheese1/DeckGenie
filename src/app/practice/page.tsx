@@ -10,7 +10,10 @@ import { UnlockModal } from '@/components/practice/UnlockModal'
 import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
 import { createClient } from '@/lib/supabase/client'
 import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
-import type { CorpusWord, VocabWord } from '@/types'
+import { SessionSummary } from '@/components/practice/SessionSummary'
+import { ReviewScreen }   from '@/components/practice/ReviewScreen'
+import { StreakFlame }    from '@/components/practice/StreakFlame'
+import type { CorpusWord, VocabWord, WrongAnswer, RoundSummary } from '@/types'
 
 function PracticeInner() {
   const router        = useRouter()
@@ -25,10 +28,18 @@ function PracticeInner() {
   const [sentenceNum, setSentenceNum]             = useState(1)
   const [analysisMode, setAnalysisMode]           = useState(false)
   const [vocabList, setVocabList]                 = useState<VocabWord[]>([])
-  const [streak, setStreak]                       = useState(0)
   const [theme, setTheme]                         = useState<ThemeId>('ink-jade')
+  const [currentStreak, setCurrentStreak]         = useState(0)
+  const [topStreak,     setTopStreak]             = useState(0)
+  const [roundCorrect,  setRoundCorrect]          = useState(0)
+  const [roundTotal,    setRoundTotal]            = useState(0)
+  const [wrongAnswers,  setWrongAnswers]          = useState<WrongAnswer[]>([])
+  const [roundSummary,  setRoundSummary]          = useState<RoundSummary | null>(null)
+  const [showSummary,   setShowSummary]           = useState(false)
+  const [showReview,    setShowReview]            = useState(false)
 
-  const cardWrapRef = useRef<HTMLDivElement>(null)
+  const cardWrapRef    = useRef<HTMLDivElement>(null)
+  const navigatingRef  = useRef(false)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -58,45 +69,96 @@ function PracticeInner() {
   useEffect(() => {
     if (state.status === 'graded' && state.grade) {
       if (state.grade.correct) {
-        setStreak(prev => prev + 1)
+        const next = currentStreak + 1
+        setCurrentStreak(next)
+        setTopStreak(prev => Math.max(prev, next))
+        setRoundCorrect(prev => prev + 1)
       } else {
-        setStreak(0)
+        setCurrentStreak(0)
+        if (state.sentence) {
+          setWrongAnswers(prev => [...prev, {
+            sentence_zh:    state.sentence!.sentence_zh,
+            sentence_py:    state.sentence!.sentence_py,
+            user_answer:    state.userAnswer,
+            correct_answer: state.grade!.correct_answer,
+            vocab_used:     state.sentence!.vocab_used,
+          }])
+        }
       }
+      setRoundTotal(prev => prev + 1)
     }
-  }, [state.status, state.grade])
+  }, [state.status, state.grade]) // eslint-disable-line
+
+  function buildSummary(): RoundSummary {
+    return {
+      total:        roundTotal,
+      correct:      roundCorrect,
+      wrong:        roundTotal - roundCorrect,
+      accuracy:     roundTotal > 0 ? Math.round((roundCorrect / roundTotal) * 100) : 0,
+      wrongAnswers: [...wrongAnswers],
+      topStreak,
+    }
+  }
+
+  function resetRound() {
+    setRoundCorrect(0)
+    setRoundTotal(0)
+    setWrongAnswers([])
+    setTopStreak(0)
+    setCurrentStreak(0)
+    setSentenceNum(1)
+  }
+
+  async function goToDashboard() {
+    if (navigatingRef.current) return
+    navigatingRef.current = true
+    try {
+      const res = await fetch('/api/words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hsk_level: settings?.starting_hsk ?? 2,
+          count:     settings?.words_per_unlock ?? 5,
+        }),
+      })
+      if (!res.ok) console.error('Word unlock failed:', res.status, await res.text())
+    } catch (err) {
+      console.error('Word unlock error:', err)
+    } finally {
+      navigatingRef.current = false
+    }
+    router.push('/dashboard')
+  }
 
   async function handleNext() {
+    // ── null-ref path: called from analysis mode (normal layout unmounted) ──
     if (!cardWrapRef.current) {
       let result
-      try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block */ }
-      if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
-        setRoundJustComplete(true)
-        setShowUnlock(true)
-        setSentenceNum(1)
+      try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* */ }
+      if (result?.roundComplete) {
+        setRoundSummary(buildSummary())
+        setShowSummary(true)
+        resetRound()
+        setAnalysisMode(false)
         return
       }
       setSentenceNum(prev => prev >= sentencesPerRound ? 1 : prev + 1)
+      setAnalysisMode(false)
       await fetchSentence()
       return
     }
 
-    await gsap.to(cardWrapRef.current, {
-      opacity: 0, x: -32, duration: 0.25, ease: 'power2.in'
-    })
+    // ── normal path ──────────────────────────────────────────────────────────
+    await gsap.to(cardWrapRef.current, { opacity: 0, x: -32, duration: 0.25, ease: 'power2.in' })
     gsap.set(cardWrapRef.current, { opacity: 1, x: 0 })
 
     let result
-    try {
-      result = await incrementSentence(state.grade?.score ?? 0)
-    } catch {
-      // don't let a tracking failure block the next sentence
-    }
+    try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* */ }
 
-    if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
-      setRoundJustComplete(true)
-      setShowUnlock(true)
-      setSentenceNum(1)
-      gsap.set(cardWrapRef.current, { opacity: 1, x: 0 })
+    if (result?.roundComplete) {
+      setRoundSummary(buildSummary())
+      setShowSummary(true)
+      resetRound()
       return
     }
 
@@ -106,25 +168,6 @@ function PracticeInner() {
       { opacity: 0, x: 32 },
       { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' }
     )
-  }
-
-  async function handleDone() {
-    let result
-    try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* don't block nav */ }
-    if (result?.roundComplete && result.roundsCompleted % roundsBeforeUnlock === 0) {
-      claimUnlock()
-    }
-    try {
-      await fetch('/api/words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hsk_level: settings?.starting_hsk ?? 2,
-          count: settings?.words_per_unlock ?? 5,
-        }),
-      })
-    } catch { /* don't block nav */ }
-    router.push('/dashboard')
   }
 
   function handleUnlockComplete(words: CorpusWord[]) {
@@ -309,19 +352,7 @@ function PracticeInner() {
             {vocabCount} words
           </span>
 
-          {streak >= 2 && (
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-              style={{
-                background: 'var(--accent-subtle)',
-                color: 'var(--accent-text)',
-                border: '0.5px solid var(--accent)',
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>🔥</span>
-              {streak} streak
-            </div>
-          )}
+          <StreakFlame streak={currentStreak} />
 
           <button
             onClick={() => router.push('/settings')}
@@ -405,7 +436,7 @@ function PracticeInner() {
         <div className="mt-6 slide-up">
           {sentenceNum === sentencesPerRound ? (
             <button
-              onClick={handleDone}
+              onClick={handleNext}
               className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
               style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
             >
@@ -448,6 +479,21 @@ function PracticeInner() {
           activeVocab={activeVocabZh}
           onComplete={handleUnlockComplete}
           completeCta={startUnlock ? 'Back to Dashboard →' : 'Keep practicing →'}
+        />
+      )}
+
+      {showSummary && roundSummary && (
+        <SessionSummary
+          summary={roundSummary}
+          onReview={() => { setShowSummary(false); setShowReview(true) }}
+          onDashboard={goToDashboard}
+        />
+      )}
+
+      {showReview && roundSummary && (
+        <ReviewScreen
+          wrongAnswers={roundSummary.wrongAnswers}
+          onDone={goToDashboard}
         />
       )}
     </div>

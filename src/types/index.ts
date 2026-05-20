@@ -85,6 +85,23 @@ export interface WordsResponse {
   words: CorpusWord[]
 }
 
+export interface WrongAnswer {
+  sentence_zh:    string
+  sentence_py:    string
+  user_answer:    string
+  correct_answer: string
+  vocab_used:     string[]
+}
+
+export interface RoundSummary {
+  total:        number
+  correct:      number
+  wrong:        number
+  accuracy:     number
+  wrongAnswers: WrongAnswer[]
+  topStreak:    number
+}
+
 export type PinyinMode = 'showing' | 'hidden'
 
 export interface SentenceState {
