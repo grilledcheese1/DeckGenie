@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { ThemePicker } from '@/components/ui/ThemePicker'
 import { ThemedLayout } from '@/components/ui/ThemedLayout'
 import { loadSavedTheme, type ThemeId } from '@/lib/theme'
+import { NeonSign } from '@/components/ui/NeonSign'
+import {NeonSignH} from "@/components/ui/NeonSignH";
 
 function SignupContent() {
   const supabase = createClient()
@@ -55,13 +57,21 @@ function SignupContent() {
     })
   }
 
+  const neonOpacity = theme === 'ink-jade' ? 1 : 0.35
+
   if (confirmationSent) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center px-4 transition-colors duration-300"
+        className="relative min-h-screen flex items-center justify-center px-4 transition-colors duration-300"
         style={{ backgroundColor: 'var(--bg-primary)' }}
       >
-        <div className="w-full max-w-sm text-center">
+        {/* Neon signs — confirmation screen. Adjust style={{ }} per sign to reposition. */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: neonOpacity, zIndex: 0 }} aria-hidden="true">
+          <NeonSign english="STUDY"    chinese="学习" color="#00fff5" glowColor="rgba(0,255,245,0.35)" size={1} delay={0}   className="absolute" style={{ left: '4%',  top: '8%' }} />
+          <NeonSign english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor="rgba(255,45,120,0.35)" size={1} delay={1.4} className="absolute" style={{ right: '4%', top: '15%' }} />
+          <NeonSign english="PROGRESS" chinese="进步" color="#ffb800" glowColor="rgba(255,184,0,0.35)"  size={1} delay={2.8} className="absolute" style={{ left: '6%',  bottom: '12%' }} />
+        </div>
+        <div className="w-full max-w-sm text-center relative" style={{ zIndex: 1 }}>
           <p className="font-hanzi text-5xl mb-6" style={{ color: 'var(--hanzi-color)' }}>汉字</p>
           <div
             className="rounded-2xl p-6"
@@ -88,10 +98,21 @@ function SignupContent() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4 transition-colors duration-300"
+      className="relative min-h-screen flex items-center justify-center px-4 transition-colors duration-300"
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
-      <div className="w-full max-w-sm">
+      {/* Neon signs — main signup form. Adjust style={{ }} per sign to reposition. */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: neonOpacity, zIndex: 0 }} aria-hidden="true">
+        {/*Left Side*/}
+        <NeonSign english="DECKGENIE"    chinese="甲板精灵" color="#00fff5" glowColor="rgba(0,255,245,0.35)" size={4} delay={0}   className="absolute" style={{ left: '-38%', top: '8%' }} />
+        <NeonSign english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor="rgba(255,45,120,0.35)" size={3} delay={1.4} className="absolute" style={{ left: '-25%', top: '-18%' }} />
+        <NeonSignH english="PROGRESS" chinese="进步" color="#ffb800" glowColor="rgba(255,184,0,0.35)"  size={2.5} delay={2.8} className="absolute" style={{ left: '4%', bottom: '40%' }} />
+
+        {/*Right Side*/}
+        <NeonSign english="REFLECT" chinese="温故知新" color="#8600FC" glowColor="rgba(123, 0, 252, 0.8)" size={4} delay={.5} className="absolute" style={{ right: '-30%', top: '-102%' }} />
+        <NeonSignH english="ORDER" chinese="循序渐进" color="#EB1C1C" glowColor="rgba(252, 0, 29, 0.8)"  size={2.5} delay={2.8} className="absolute" style={{ left: '70%', bottom: '110%' }} />
+      </div>
+      <div className="w-full max-w-sm relative" style={{ zIndex: 1 }}>
         {/* Logo */}
         <div className="text-center mb-8">
           <p className="font-hanzi text-5xl mb-2" style={{ color: 'var(--hanzi-color)' }}>汉字</p>

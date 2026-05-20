@@ -133,3 +133,42 @@ body {
 .hover-accent:hover { background-color: var(--accent-hover) !important; }
 .hover-border:hover { border-color: var(--border-hover) !important; }
 .hover-bg:hover     { background-color: var(--bg-tertiary) !important; }
+
+/* ── Neon sign animations ─────────────────────────── */
+
+@keyframes neon-flicker {
+  0%   { opacity: 1; }
+  2%   { opacity: 0.85; }
+  4%   { opacity: 1; }
+  8%   { opacity: 0.9; }
+  10%  { opacity: 1; }
+  45%  { opacity: 1; }
+  47%  { opacity: 0.78; }
+  49%  { opacity: 1; }
+  75%  { opacity: 1; }
+  77%  { opacity: 0.88; }
+  79%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes neon-pulse {
+  0%   { opacity: 0.85; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.85; }
+}
+
+@keyframes neon-warmup {
+  0%   { opacity: 0; }
+  15%  { opacity: 0.3; }
+  20%  { opacity: 0.1; }
+  25%  { opacity: 0.6; }
+  30%  { opacity: 0.2; }
+  40%  { opacity: 0.8; }
+  50%  { opacity: 0.5; }
+  60%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+.neon-flicker { animation: neon-flicker 8s infinite; }
+.neon-pulse   { animation: neon-pulse 3s ease-in-out infinite; }
+.neon-warmup  { animation: neon-warmup 1.8s ease-out forwards; }
