@@ -37,6 +37,7 @@ export function NeonSignH({
   const [phase, setPhase]             = useState<SignPhase>('warmup')
   const [glowOn, setGlowOn]           = useState(false)
   const timeoutsRef                   = useRef<ReturnType<typeof setTimeout>[]>([])
+  const runCycleRef                   = useRef<(() => void) | undefined>(undefined)
 
   function clearAll() {
     timeoutsRef.current.forEach(clearTimeout)
@@ -84,7 +85,7 @@ export function NeonSignH({
                 } else {
                   setPhase('hold-zh')
                   after(HOLD_DURATION * 1.5, () => {
-                    after(RESTART_DELAY, runCycle)
+                    after(RESTART_DELAY, () => runCycleRef.current?.())
                   })
                 }
               }
@@ -96,7 +97,9 @@ export function NeonSignH({
       }
     }
     typeEn()
-  }, [english, chinese]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [english, chinese])
+
+  runCycleRef.current = runCycle
 
   useEffect(() => {
     const warmup = setTimeout(() => {
