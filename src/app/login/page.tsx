@@ -55,17 +55,18 @@ function LoginContent() {
       {/* Neon signs — left of the login form. Adjust top/left/bottom values to reposition. */}
       <div
         className="fixed inset-0 pointer-events-none overflow-hidden"
-        style={{ zIndex: 0 }}
+        style={{ opacity: 0.13, zIndex: 0 }}
         aria-hidden="true"
       >
         {/*Left Side*/}
-        <NeonSign english="DECKGENIE"  chinese="甲板精灵" color="#00fff5" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-38%', top: '8%' }} />
-        <NeonSign english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor={signMode === 'neon' ? "rgba(255,45,120,0.35)" : undefined} size={3} delay={1.4} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-25%', top: '-18%' }} />
-        <NeonSignH english="PROGRESS" chinese="进步" color="#ffb800" glowColor={signMode === 'neon' ? "rgba(255,184,0,0.35)" : undefined}  size={2.5} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '4%', bottom: '40%' }} />
+        <NeonSign english="DECKGENIE"  chinese="甲板精灵" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-40%', top: '6%' }} />
+        <NeonSign english="PERSIST"  chinese="坚持" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={3} delay={1.4} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-27%', top: '-41%' }} />
+        <NeonSignH english="PROGRESS" chinese="进步" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={2.5} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '4%', bottom: '39%' }} />
 
         {/*Right Side*/}
-        <NeonSign english="REFLECT" chinese="温故知新" color="#8600FC" glowColor={signMode === 'neon' ? "rgba(123, 0, 252, 0.8)" : undefined} size={4} delay={.5} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ right: '-30%', top: '-102%' }} />
-        <NeonSignH english="ORDER" chinese="循序渐进" color="#EB1C1C" glowColor={signMode === 'neon' ? "rgba(252, 0, 29, 0.8)" : undefined}  size={2.5} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '70%', bottom: '110%' }} />
+        <NeonSign english="REFLECT" chinese="温故知新" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={3.5} delay={.5} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ right: '-38%', top: '-102%' }} />
+        <NeonSign english="ORDER" chinese="循序渐进" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={2.2} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '27%',  bottom: '170%' }} />
+        <NeonSign english="LEARNING WITHOUT THINKING IS USELESS" chinese="学而不思则罔，思而不学则殆 " color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={1} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '27%',  bottom: '168%' }} />
 
       </div>
       <div className="w-full max-w-sm relative" style={{ zIndex: 1 }}>

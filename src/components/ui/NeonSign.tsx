@@ -151,7 +151,12 @@ export function NeonSign({
   }, [delay, runCycle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (mode !== 'neon' || !borderRef.current) return
+    if (!borderRef.current) return
+    gsap.killTweensOf(borderRef.current, 'boxShadow')
+    if (mode !== 'neon') {
+      gsap.set(borderRef.current, { boxShadow: 'none' })
+      return
+    }
     if (phase === 'hold-en' || phase === 'hold-zh') {
       gsap.to(borderRef.current, {
         boxShadow: `0 0 18px 4px ${effectiveGlowColor}, inset 0 0 12px 2px ${effectiveGlowColor}`,
