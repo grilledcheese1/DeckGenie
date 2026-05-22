@@ -45,12 +45,26 @@ Respond with ONLY valid JSON, no markdown:
     parsed.correct = parsed.score >= 70
 
     if (vocab_used?.length) {
-      for (const zh of vocab_used) {
-        supabase.from('vocab_list')
-          .update({ times_seen: supabase.rpc('increment', { x: 1 }) as unknown as number })
-          .eq('user_id', user.id).eq('word_zh', zh).then(() => {})
-      }
+      await Promise.all(vocab_used.map(zh =>
+        supabase.rpc('record_word_attempt', {
+          p_user_id: user.id,
+          p_word_zh: zh,
+          p_correct: parsed.correct,
+        })
+      ))
     }
+
+    supabase.from('sentence_attempts').insert({
+      user_id:         user.id,
+      sentence_zh,
+      sentence_py,
+      user_answer:     body.user_answer,
+      correct_answer:  parsed.correct_answer,
+      score:           parsed.score,
+      correct:         parsed.correct,
+      strictness_used: strictness,
+      vocab_used:      vocab_used ?? [],
+    }).then(() => {})
 
     return NextResponse.json(parsed)
   } catch (err) {

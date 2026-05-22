@@ -34,6 +34,7 @@ function SettingsInner() {
     show_pinyin: 'tap', show_hints: 'after',
   })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [theme, setTheme] = useState<ThemeId>('ink-jade')
 
   const loadSettings = useCallback(async () => {
@@ -57,13 +58,15 @@ function SettingsInner() {
 
   async function handleSave() {
     setSaving(true)
+    setSaveError('')
     localStorage.setItem('hanzi_settings', JSON.stringify(settings))
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.from('settings').upsert({ ...settings, user_id: user.id }, { onConflict: 'user_id' })
+        const { error } = await supabase.from('settings').upsert({ ...settings, user_id: user.id }, { onConflict: 'user_id' })
+        if (error) { setSaveError(error.message); setSaving(false); return }
       }
-    } catch {}
+    } catch (e) { setSaveError(String(e)); setSaving(false); return }
     if (isFirstRun) {
       try {
         await fetch('/api/words', {
@@ -265,6 +268,12 @@ function SettingsInner() {
       </div>
 
       <div className="mt-10">
+        {saveError && (
+          <p className="text-xs mb-3 px-3 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--error-bg)', border: '1px solid var(--error-border)', color: 'var(--error-text)' }}>
+            {saveError}
+          </p>
+        )}
         <button
           onClick={handleSave}
           disabled={saving}

@@ -20,7 +20,7 @@ function PracticeInner() {
   const searchParams  = useSearchParams()
   const startUnlock   = searchParams.get('unlock') === 'true'
 
-  const { progress, settings, vocabCount, incrementSentence, resetRoundCounter, claimUnlock } = useProgress()
+  const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock } = useProgress()
   const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer } = usePractice(settings?.strictness ?? 2)
 
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
@@ -136,8 +136,17 @@ function PracticeInner() {
       let result
       try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* */ }
       if (result?.roundComplete) {
-        setRoundSummary(buildSummary())
+        const summary = buildSummary()
+        setRoundSummary(summary)
         setShowSummary(true)
+        finishRound({
+          sentences_total:   summary.total,
+          sentences_correct: summary.correct,
+          accuracy_pct:      summary.accuracy,
+          top_streak:        summary.topStreak,
+          strictness:        settings?.strictness ?? 2,
+          round_number:      progress?.current_round_number ?? 1,
+        })
         resetRound()
         setAnalysisMode(false)
         return
@@ -156,8 +165,17 @@ function PracticeInner() {
     try { result = await incrementSentence(state.grade?.score ?? 0) } catch { /* */ }
 
     if (result?.roundComplete) {
-      setRoundSummary(buildSummary())
+      const summary = buildSummary()
+      setRoundSummary(summary)
       setShowSummary(true)
+      finishRound({
+        sentences_total:   summary.total,
+        sentences_correct: summary.correct,
+        accuracy_pct:      summary.accuracy,
+        top_streak:        summary.topStreak,
+        strictness:        settings?.strictness ?? 2,
+        round_number:      progress?.current_round_number ?? 1,
+      })
       resetRound()
       return
     }

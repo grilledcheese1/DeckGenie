@@ -19,12 +19,16 @@ function writeLocal(key: string, value: unknown) {
   if (typeof window !== 'undefined') localStorage.setItem(key, JSON.stringify(value))
 }
 
-const DEFAULT_PROGRESS: Omit<Progress, 'id' | 'user_id' | 'updated_at' | 'accuracy_history'> = {
+const DEFAULT_PROGRESS: Omit<Progress, 'id' | 'user_id' | 'updated_at'> = {
   rounds_completed: 0,
   sentences_completed: 0,
   current_round_sentences: 0,
   current_round_number: 1,
   rolling_accuracy: 0,
+  streak_days: 0,
+  longest_streak_days: 0,
+  last_practiced_at: null,
+  last_claimed_round: 0,
 }
 
 const DEFAULT_SETTINGS: Partial<Settings> = {
@@ -58,9 +62,9 @@ export function useProgress() {
           writeLocal(PROGRESS_KEY, prog)
         } else {
           // Try to create a DB row; fall back to localStorage / defaults regardless
-          supabase.from('progress').upsert({ user_id: user.id, ...DEFAULT_PROGRESS, accuracy_history: [] }, { onConflict: 'user_id' }).then(() => {})
+          supabase.from('progress').upsert({ user_id: user.id, ...DEFAULT_PROGRESS }, { onConflict: 'user_id' }).then(() => {})
           const cached = readLocal<Progress>(PROGRESS_KEY)
-          setProgress(cached ?? { ...DEFAULT_PROGRESS, accuracy_history: [] } as unknown as Progress)
+          setProgress(cached ?? { ...DEFAULT_PROGRESS } as unknown as Progress)
         }
 
         if (sett) {
@@ -79,7 +83,7 @@ export function useProgress() {
 
     // No auth or network failure — use localStorage entirely
     const cachedProg = readLocal<Progress>(PROGRESS_KEY)
-    setProgress(cachedProg ?? { ...DEFAULT_PROGRESS, accuracy_history: [] } as unknown as Progress)
+    setProgress(cachedProg ?? { ...DEFAULT_PROGRESS } as unknown as Progress)
     const cachedSett = readLocal<Settings>(SETTINGS_KEY)
     setSettings(cachedSett ?? DEFAULT_SETTINGS as Settings)
     setLoading(false)
@@ -121,10 +125,39 @@ export function useProgress() {
     return { roundComplete, roundsCompleted: newRoundsCompleted }
   }
 
+  async function finishRound(summary: {
+    sentences_total: number
+    sentences_correct: number
+    accuracy_pct: number
+    top_streak: number
+    strictness: number
+    round_number: number
+  }) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.rpc('complete_round', {
+          p_user_id:           user.id,
+          p_round_number:      summary.round_number,
+          p_sentences_total:   summary.sentences_total,
+          p_sentences_correct: summary.sentences_correct,
+          p_accuracy_pct:      summary.accuracy_pct,
+          p_top_streak:        summary.top_streak,
+          p_strictness:        summary.strictness,
+        })
+      }
+    } catch {}
+  }
+
   function claimUnlock() {
     const r = progress?.rounds_completed ?? 0
     setLastClaimedRound(r)
     writeLocal(UNLOCK_CLAIMED_KEY, r)
+    try {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) supabase.rpc('claim_unlock', { p_user_id: user.id }).then(() => {})
+      })
+    } catch {}
   }
 
   async function resetRoundCounter() {
@@ -147,5 +180,5 @@ export function useProgress() {
     && roundsCompleted % roundsBeforeUnlock === 0
     && roundsCompleted > lastClaimedRound
 
-  return { progress, settings, vocabCount, loading, reload: load, incrementSentence, resetRoundCounter, claimUnlock, canUnlock }
+  return { progress, settings, vocabCount, loading, reload: load, incrementSentence, finishRound, resetRoundCounter, claimUnlock, canUnlock }
 }

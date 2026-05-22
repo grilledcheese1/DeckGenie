@@ -33,14 +33,12 @@ export interface Progress {
   sentences_completed: number
   current_round_sentences: number
   current_round_number: number
-  accuracy_history: AccuracyEntry[]
   rolling_accuracy: number
+  streak_days: number
+  longest_streak_days: number
+  last_practiced_at: string | null
+  last_claimed_round: number
   updated_at: string
-}
-
-export interface AccuracyEntry {
-  date: string
-  accuracy: number
 }
 
 export interface CorpusWord {

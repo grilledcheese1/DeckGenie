@@ -22,9 +22,11 @@ export async function POST(req: NextRequest) {
   const allExcluded = Array.from(new Set([...exclude_zh, ...ownedZh]))
 
   const maxHsk = hsk_level ?? (settings?.starting_hsk ?? 2)
-  let candidates = getCorpusForHsk(maxHsk, allExcluded)
-  candidates = filterCorpus(candidates, { pos, topic })
-  if (candidates.length === 0) candidates = getCorpusForHsk(maxHsk, allExcluded)
+  const base = getCorpusForHsk(maxHsk, allExcluded)
+  let candidates = filterCorpus(base, { pos, topic })
+  if (candidates.length === 0) candidates = filterCorpus(base, { pos })
+  if (candidates.length === 0) candidates = filterCorpus(base, { topic })
+  if (candidates.length === 0) candidates = base
 
   const weighted = candidates.flatMap(w => Array(7 - w.hsk).fill(w))
   const shuffled = weighted.sort(() => Math.random() - 0.5)
