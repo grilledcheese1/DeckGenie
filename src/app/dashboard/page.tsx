@@ -8,7 +8,8 @@ import { useVocabSheet } from '@/hooks/useVocabSheet'
 import { VocabSheet } from '@/components/vocab/VocabSheet'
 import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
-import {NeonSignH} from "@/components/ui/NeonSignH";
+import type { SignMode } from '@/components/ui/NeonSign'
+import { NeonSignH } from '@/components/ui/NeonSignH'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -19,6 +20,12 @@ export default function DashboardPage() {
   } = useVocabSheet()
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [signMode] = useState<SignMode>(() => {
+    if (typeof window === 'undefined') return 'neon'
+    const saved = localStorage.getItem('hanzi-theme') ?? 'ink-jade'
+    return saved === 'vermillion-cream' ? 'vermillion' :
+           saved === 'bamboo-light'     ? 'bamboo'     : 'neon'
+  })
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -69,10 +76,10 @@ export default function DashboardPage() {
     <div ref={containerRef} className="min-h-screen px-4 py-8 max-w-lg mx-auto">
       {/* Neon signs — dashboard background. Adjust style={{ }} per sign to reposition. */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.13, zIndex: 0 }} aria-hidden="true">
-        <NeonSign english="MASTER"    chinese="融会贯通 " color="#00fff5" glowColor="rgba(0,255,245,0.35)" size={4} delay={0}   className="absolute" style={{ left: '-38%',  top: '8%' }} />
-        <NeonSignH english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor="rgba(255,45,120,0.35)" size={2.5} delay={1} className="absolute" style={{ left: '6%', bottom: '4%'}} />
-        <NeonSign english="LEARNING" chinese="沉浸式学习" color="#ffb800" glowColor="rgba(255,184,0,0.35)"  size={3.3} delay={2} className="absolute" style={{ left: '40%',  bottom: '60%' }} />
-        <NeonSign english="CULTIVATION" chinese="语感培养 " color="#AEFF00" glowColor="rgba(157, 255, 0, 0.8)"  size={2.3} delay={2.4} className="absolute" style={{ left: '29%',  bottom: '80%' }} />
+        <NeonSign english="MASTER"    chinese="融会贯通 " color="#00fff5" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0}   mode={signMode} className="absolute" style={{ left: '-38%',  top: '8%' }} />
+        <NeonSignH english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor={signMode === 'neon' ? "rgba(255,45,120,0.35)" : undefined} size={2.5} delay={1} mode={signMode} className="absolute" style={{ left: '6%', bottom: '4%'}} />
+        <NeonSign english="LEARNING" chinese="沉浸式学习" color="#ffb800" glowColor={signMode === 'neon' ? "rgba(255,184,0,0.35)" : undefined}  size={3.3} delay={2} mode={signMode} className="absolute" style={{ left: '40%',  bottom: '60%' }} />
+        <NeonSign english="CULTIVATION" chinese="语感培养 " color="#AEFF00" glowColor={signMode === 'neon' ? "rgba(157, 255, 0, 0.8)" : undefined}  size={2.3} delay={2.4} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '80%' }} />
       </div>
       <div className="relative" style={{ zIndex: 1 }}>
 
