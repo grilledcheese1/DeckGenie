@@ -60,11 +60,17 @@ export function useProgress() {
         if (prog) {
           setProgress(prog)
           writeLocal(PROGRESS_KEY, prog)
+          setLastClaimedRound(prog.last_claimed_round)
+          writeLocal(UNLOCK_CLAIMED_KEY, prog.last_claimed_round)
         } else {
           // Try to create a DB row; fall back to localStorage / defaults regardless
-          supabase.from('progress').upsert({ user_id: user.id, ...DEFAULT_PROGRESS }, { onConflict: 'user_id' }).then(() => {})
+          const { error: upsertError } = await supabase.from('progress').upsert(
+            { user_id: user.id, ...DEFAULT_PROGRESS },
+            { onConflict: 'user_id' }
+          )
+          if (upsertError) console.error('progress upsert failed:', upsertError.message)
           const cached = readLocal<Progress>(PROGRESS_KEY)
-          setProgress(cached ?? { ...DEFAULT_PROGRESS } as unknown as Progress)
+          setProgress({ ...DEFAULT_PROGRESS, ...(cached ?? {}) } as unknown as Progress)
         }
 
         if (sett) {
@@ -83,7 +89,7 @@ export function useProgress() {
 
     // No auth or network failure — use localStorage entirely
     const cachedProg = readLocal<Progress>(PROGRESS_KEY)
-    setProgress(cachedProg ?? { ...DEFAULT_PROGRESS } as unknown as Progress)
+    setProgress({ ...DEFAULT_PROGRESS, ...(cachedProg ?? {}) } as unknown as Progress)
     const cachedSett = readLocal<Settings>(SETTINGS_KEY)
     setSettings(cachedSett ?? DEFAULT_SETTINGS as Settings)
     setLoading(false)
@@ -149,14 +155,23 @@ export function useProgress() {
     } catch {}
   }
 
-  function claimUnlock() {
+  async function claimUnlock() {
     const r = progress?.rounds_completed ?? 0
     setLastClaimedRound(r)
     writeLocal(UNLOCK_CLAIMED_KEY, r)
     try {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) supabase.rpc('claim_unlock', { p_user_id: user.id }).then(() => {})
-      })
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.rpc('claim_unlock', { p_user_id: user.id })
+        const { data } = await supabase.from('progress')
+          .select('last_claimed_round')
+          .eq('user_id', user.id)
+          .single()
+        if (data != null) {
+          setLastClaimedRound(data.last_claimed_round)
+          writeLocal(UNLOCK_CLAIMED_KEY, data.last_claimed_round)
+        }
+      }
     } catch {}
   }
 
