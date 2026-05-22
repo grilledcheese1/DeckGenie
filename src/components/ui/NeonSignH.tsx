@@ -43,6 +43,7 @@ export function NeonSignH({
   const runCycleRef                   = useRef<(() => void) | undefined>(undefined)
 
   const isNeon = mode === 'neon'
+  const effectiveGlowColor = glowColor || color
   const S = mode === 'vermillion' ? {
     bg:          'rgba(192,57,43,0.06)',
     border:      '1.5px solid rgba(192,57,43,0.5)',
@@ -64,12 +65,12 @@ export function NeonSignH({
   } : {
     bg:          'rgba(0,0,0,0.35)',
     border:      `1.5px solid ${color}`,
-    boxShadow:   `0 0 8px 1px ${glowColor}, inset 0 0 4px 1px ${glowColor}`,
+    boxShadow:   `0 0 8px 1px ${effectiveGlowColor}, inset 0 0 4px 1px ${effectiveGlowColor}`,
     textColor:   color,
     textShadow:  `0 0 8px ${color}, 0 0 16px ${color}`,
     cursorShadow:`0 0 8px ${color}`,
     dotColor:    color,
-    dotShadow:   `0 0 6px 2px ${glowColor}`,
+    dotShadow:   `0 0 6px 2px ${effectiveGlowColor}`,
   }
 
   function clearAll() {
@@ -151,13 +152,13 @@ export function NeonSignH({
     if (mode !== 'neon' || !borderRef.current) return
     if (phase === 'hold-en' || phase === 'hold-zh') {
       gsap.to(borderRef.current, {
-        boxShadow: `0 0 18px 4px ${glowColor}, inset 0 0 12px 2px ${glowColor}`,
+        boxShadow: `0 0 18px 4px ${effectiveGlowColor}, inset 0 0 12px 2px ${effectiveGlowColor}`,
         duration: 0.6,
         ease: 'power2.out',
       })
     } else {
       gsap.to(borderRef.current, {
-        boxShadow: `0 0 8px 1px ${glowColor}, inset 0 0 4px 1px ${glowColor}`,
+        boxShadow: `0 0 8px 1px ${effectiveGlowColor}, inset 0 0 4px 1px ${effectiveGlowColor}`,
         duration: 0.4,
       })
     }
