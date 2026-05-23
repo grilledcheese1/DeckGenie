@@ -7,16 +7,26 @@ import type { GenerateResponse, GradeResponse } from '@/types'
 function SpeakerButton({ text }: { text: string }) {
   const [speaking, setSpeaking] = useState(false)
 
-  function speak() {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const utt = new SpeechSynthesisUtterance(text)
-    utt.lang = 'zh-CN'
-    utt.rate = 0.85
-    utt.onstart = () => setSpeaking(true)
-    utt.onend   = () => setSpeaking(false)
-    utt.onerror = () => setSpeaking(false)
-    window.speechSynthesis.speak(utt)
+  async function speak() {
+    setSpeaking(true)
+    try {
+      const res = await fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new Error('TTS failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => {
+        setSpeaking(false)
+        URL.revokeObjectURL(url)
+      }
+      audio.play()
+    } catch {
+      setSpeaking(false)
+    }
   }
 
   return (

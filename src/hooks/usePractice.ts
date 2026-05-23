@@ -48,6 +48,7 @@ export function usePractice(strictness: number = 2) {
           vocab_used: state.sentence.vocab_used,
         }),
       })
+      if (!res.ok) throw new Error('Grade request failed')
       const grade: GradeResponse = await res.json()
       setState(prev => ({ ...prev, grade, status: 'graded' }))
     } catch {
