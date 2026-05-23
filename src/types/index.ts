@@ -109,3 +109,19 @@ export interface SentenceState {
   grade: GradeResponse | null
   status: 'loading' | 'ready' | 'submitted' | 'graded'
 }
+
+export interface SessionDraft {
+  userId: string
+  savedAt: number
+  sentenceNum: number
+  currentStreak: number
+  topStreak: number
+  roundCorrect: number
+  roundTotal: number
+  wrongAnswers: WrongAnswer[]
+  sentence: GenerateResponse
+  userAnswer: string
+  grade: GradeResponse | null
+  status: 'ready' | 'graded'
+  pinyinMode: PinyinMode
+}

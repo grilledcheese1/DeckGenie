@@ -13,7 +13,33 @@ import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
 import { SessionSummary } from '@/components/practice/SessionSummary'
 import { ReviewScreen }   from '@/components/practice/ReviewScreen'
 import { StreakFlame }    from '@/components/practice/StreakFlame'
-import type { CorpusWord, VocabWord, WrongAnswer, RoundSummary } from '@/types'
+import type { CorpusWord, VocabWord, WrongAnswer, RoundSummary, SessionDraft } from '@/types'
+
+const DRAFT_KEY = 'hanzi_session_draft'
+const DRAFT_TTL = 24 * 60 * 60 * 1000
+
+function saveDraft(draft: SessionDraft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch {}
+}
+function loadDraft(userId: string): SessionDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const d: SessionDraft = JSON.parse(raw)
+    if (typeof d.userId !== 'string' || !d.userId || !isFinite(d.savedAt)) {
+      localStorage.removeItem(DRAFT_KEY)
+      return null
+    }
+    if (d.userId !== userId || Date.now() - d.savedAt > DRAFT_TTL) {
+      localStorage.removeItem(DRAFT_KEY)
+      return null
+    }
+    return d
+  } catch { return null }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY) } catch {}
+}
 
 function PracticeInner() {
   const router        = useRouter()
@@ -21,7 +47,7 @@ function PracticeInner() {
   const startUnlock   = searchParams.get('unlock') === 'true'
 
   const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock } = useProgress()
-  const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer } = usePractice(settings?.strictness ?? 2)
+  const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence } = usePractice(settings?.strictness ?? 2)
 
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
   const [roundJustComplete, setRoundJustComplete] = useState(false)
@@ -38,8 +64,10 @@ function PracticeInner() {
   const [showSummary,   setShowSummary]           = useState(false)
   const [showReview,    setShowReview]            = useState(false)
 
-  const cardWrapRef    = useRef<HTMLDivElement>(null)
-  const navigatingRef  = useRef(false)
+  const cardWrapRef      = useRef<HTMLDivElement>(null)
+  const navigatingRef    = useRef(false)
+  const userIdRef        = useRef<string | null>(null)
+  const clearedDraftRef  = useRef(false)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -49,21 +77,34 @@ function PracticeInner() {
   useEffect(() => { setTheme(loadSavedTheme()) }, [])
 
   useEffect(() => {
-    async function fetchVocab() {
+    async function init() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase
-        .from('vocab_list')
-        .select('*')
-        .eq('user_id', user.id)
+      userIdRef.current = user.id
+      const { data } = await supabase.from('vocab_list').select('*').eq('user_id', user.id)
       setVocabList(data ?? [])
+      if (startUnlock) return
+      const draft = loadDraft(user.id)
+      if (draft) {
+        setSentenceNum(draft.sentenceNum)
+        setCurrentStreak(draft.currentStreak)
+        setTopStreak(draft.topStreak)
+        setRoundCorrect(draft.roundCorrect)
+        setRoundTotal(draft.roundTotal)
+        setWrongAnswers(draft.wrongAnswers)
+        restoreSentence({
+          sentence: draft.sentence,
+          userAnswer: draft.userAnswer,
+          grade: draft.grade,
+          status: draft.status,
+          pinyinMode: draft.pinyinMode,
+        })
+      } else {
+        fetchSentence()
+      }
     }
-    fetchVocab()
-  }, [])
-
-  useEffect(() => {
-    if (!startUnlock) fetchSentence()
+    init()
   }, []) // eslint-disable-line
 
   useEffect(() => {
@@ -88,6 +129,27 @@ function PracticeInner() {
       setRoundTotal(prev => prev + 1)
     }
   }, [state.status, state.grade]) // eslint-disable-line
+
+  useEffect(() => {
+    if (state.status === 'loading') { clearedDraftRef.current = false; return }
+    if (!userIdRef.current || !state.sentence || state.status === 'submitted') return
+    if (clearedDraftRef.current) return
+    saveDraft({
+      userId: userIdRef.current,
+      savedAt: Date.now(),
+      sentenceNum,
+      currentStreak,
+      topStreak,
+      roundCorrect,
+      roundTotal,
+      wrongAnswers,
+      sentence: state.sentence,
+      userAnswer: state.userAnswer,
+      grade: state.grade,
+      status: state.status as 'ready' | 'graded',
+      pinyinMode: state.pinyinMode,
+    })
+  }, [state, sentenceNum, currentStreak, topStreak, roundCorrect, roundTotal, wrongAnswers])
 
   function buildSummary(): RoundSummary {
     return {
@@ -147,6 +209,8 @@ function PracticeInner() {
           strictness:        settings?.strictness ?? 2,
           round_number:      progress?.current_round_number ?? 1,
         })
+        clearDraft()
+        clearedDraftRef.current = true
         resetRound()
         setAnalysisMode(false)
         return
@@ -176,6 +240,8 @@ function PracticeInner() {
         strictness:        settings?.strictness ?? 2,
         round_number:      progress?.current_round_number ?? 1,
       })
+      clearDraft()
+      clearedDraftRef.current = true
       resetRound()
       return
     }
@@ -190,6 +256,8 @@ function PracticeInner() {
 
   function handleUnlockComplete(words: CorpusWord[]) {
     claimUnlock()
+    clearDraft()
+    clearedDraftRef.current = true
     setShowUnlock(false)
     setRoundJustComplete(false)
     setSentenceNum(1)
