@@ -1,5 +1,4 @@
-import { ElevenLabsClient, play } from '@elevenlabs/elevenlabs-js'
-import { Readable } from 'stream'
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { createClient } from '@/lib/supabase/server'
 
 const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
@@ -10,17 +9,19 @@ export async function POST(req: Request) {
   if (!user) return new Response('Unauthorized', { status: 401 })
 
   const { text } = await req.json()
-  if (!text) return new Response('Missing text', { status: 400 })
+  if (typeof text !== 'string') return new Response('text must be a string', { status: 400 })
+  const trimmed = text.trim()
+  if (!trimmed) return new Response('text is empty', { status: 400 })
+  if (trimmed.length > 2000) return new Response('text exceeds 2000 characters', { status: 400 })
 
   try {
     const audio = await elevenlabs.textToSpeech.convert(
       process.env.ELEVENLABS_VOICE_ID!,
-      { text, modelId: process.env.ELEVENLABS_MODEL_ID }
+      { text: trimmed, modelId: process.env.ELEVENLABS_MODEL_ID }
     )
-    // Readable.fromWeb converts Web ReadableStream → Node.js Readable (AsyncIterable)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    play(Readable.fromWeb(audio as any)).catch(console.error)
-    return new Response('OK', { status: 200 })
+    return new Response(audio as unknown as ReadableStream, {
+      headers: { 'Content-Type': 'audio/mpeg' },
+    })
   } catch (err) {
     console.error('[speak] error:', err)
     return new Response('TTS failed', { status: 500 })

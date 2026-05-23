@@ -10,12 +10,21 @@ function SpeakerButton({ text }: { text: string }) {
   async function speak() {
     setSpeaking(true)
     try {
-      await fetch('/api/speak', {
+      const res = await fetch('/api/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-    } finally {
+      if (!res.ok) throw new Error('TTS failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => {
+        setSpeaking(false)
+        URL.revokeObjectURL(url)
+      }
+      audio.play()
+    } catch {
       setSpeaking(false)
     }
   }
