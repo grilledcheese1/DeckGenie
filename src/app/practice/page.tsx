@@ -26,6 +26,10 @@ function loadDraft(userId: string): SessionDraft | null {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return null
     const d: SessionDraft = JSON.parse(raw)
+    if (typeof d.userId !== 'string' || !d.userId || !isFinite(d.savedAt)) {
+      localStorage.removeItem(DRAFT_KEY)
+      return null
+    }
     if (d.userId !== userId || Date.now() - d.savedAt > DRAFT_TTL) {
       localStorage.removeItem(DRAFT_KEY)
       return null
@@ -60,9 +64,10 @@ function PracticeInner() {
   const [showSummary,   setShowSummary]           = useState(false)
   const [showReview,    setShowReview]            = useState(false)
 
-  const cardWrapRef    = useRef<HTMLDivElement>(null)
-  const navigatingRef  = useRef(false)
-  const userIdRef      = useRef<string | null>(null)
+  const cardWrapRef      = useRef<HTMLDivElement>(null)
+  const navigatingRef    = useRef(false)
+  const userIdRef        = useRef<string | null>(null)
+  const clearedDraftRef  = useRef(false)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -126,7 +131,9 @@ function PracticeInner() {
   }, [state.status, state.grade]) // eslint-disable-line
 
   useEffect(() => {
-    if (!userIdRef.current || !state.sentence || state.status === 'loading' || state.status === 'submitted') return
+    if (state.status === 'loading') { clearedDraftRef.current = false; return }
+    if (!userIdRef.current || !state.sentence || state.status === 'submitted') return
+    if (clearedDraftRef.current) return
     saveDraft({
       userId: userIdRef.current,
       savedAt: Date.now(),
@@ -203,6 +210,7 @@ function PracticeInner() {
           round_number:      progress?.current_round_number ?? 1,
         })
         clearDraft()
+        clearedDraftRef.current = true
         resetRound()
         setAnalysisMode(false)
         return
@@ -233,6 +241,7 @@ function PracticeInner() {
         round_number:      progress?.current_round_number ?? 1,
       })
       clearDraft()
+      clearedDraftRef.current = true
       resetRound()
       return
     }
@@ -248,6 +257,7 @@ function PracticeInner() {
   function handleUnlockComplete(words: CorpusWord[]) {
     claimUnlock()
     clearDraft()
+    clearedDraftRef.current = true
     setShowUnlock(false)
     setRoundJustComplete(false)
     setSentenceNum(1)

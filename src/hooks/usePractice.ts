@@ -71,6 +71,10 @@ export function usePractice(strictness: number = 2) {
     status: 'ready' | 'graded'
     pinyinMode: PinyinMode
   }) => {
+    recentRef.current = [
+      { zh: draft.sentence.sentence_zh, py: draft.sentence.sentence_py },
+      ...recentRef.current,
+    ].slice(0, 5)
     setState(draft)
   }, [])
 
