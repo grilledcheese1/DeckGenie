@@ -20,6 +20,7 @@ export default function DashboardPage() {
   } = useVocabSheet()
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [hasDraft, setHasDraft]   = useState(false)
   const [signMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
     const saved = localStorage.getItem('hanzi-theme') ?? 'ink-jade'
@@ -27,6 +28,21 @@ export default function DashboardPage() {
            saved === 'bamboo-light'     ? 'bamboo'     : 'neon'
   })
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    async function checkDraft() {
+      try {
+        const raw = localStorage.getItem('hanzi_session_draft')
+        if (!raw) return
+        const d = JSON.parse(raw)
+        if (typeof d.userId !== 'string' || !d.userId || !isFinite(d.savedAt)) return
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && d.userId === user.id) setHasDraft(true)
+      } catch {}
+    }
+    checkDraft()
+  }, [])
 
   useEffect(() => {
     if (loading || !containerRef.current) return
@@ -46,6 +62,11 @@ export default function DashboardPage() {
 
   function handleCloseVocab() {
     setSheetOpen(false)
+  }
+
+  function handleResetDraft() {
+    try { localStorage.removeItem('hanzi_session_draft') } catch {}
+    setHasDraft(false)
   }
 
   async function handleSignOut() {
@@ -198,13 +219,32 @@ export default function DashboardPage() {
 
       {/* Action buttons */}
       <div className="dash-card space-y-3 mt-2">
-        <button
-          onClick={() => router.push('/practice')}
-          className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
-          style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-        >
-          {currentSentences > 0 ? 'Continue practice' : 'Start practice'}
-        </button>
+        {hasDraft ? (
+          <div className="flex gap-3">
+            <button
+              onClick={handleResetDraft}
+              className="flex-1 active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            >
+              Reset session
+            </button>
+            <button
+              onClick={() => router.push('/practice')}
+              className="flex-1 active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+            >
+              Continue practice
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => router.push('/practice')}
+            className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+            style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+          >
+            {currentSentences > 0 ? 'Continue practice' : 'Start practice'}
+          </button>
+        )}
 
         <button
           onClick={handleOpenVocab}
