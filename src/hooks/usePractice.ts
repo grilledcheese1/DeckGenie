@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import type { GenerateResponse, GradeResponse, SentenceState } from '@/types'
+import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode } from '@/types'
 
 export function usePractice(strictness: number = 2) {
   const [state, setState] = useState<SentenceState>({
@@ -64,5 +64,15 @@ export function usePractice(strictness: number = 2) {
     setState(prev => ({ ...prev, userAnswer: answer }))
   }, [])
 
-  return { state, fetchSentence, submitAnswer, togglePinyin, setAnswer }
+  const restoreSentence = useCallback((draft: {
+    sentence: GenerateResponse
+    userAnswer: string
+    grade: GradeResponse | null
+    status: 'ready' | 'graded'
+    pinyinMode: PinyinMode
+  }) => {
+    setState(draft)
+  }, [])
+
+  return { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence }
 }
