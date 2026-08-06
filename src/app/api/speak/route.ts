@@ -1,12 +1,12 @@
+import { NextResponse } from 'next/server'
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/api/auth'
 
 const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
 
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireUser()
+  if (auth instanceof NextResponse) return auth
 
   const { text } = await req.json()
   if (typeof text !== 'string') return new Response('text must be a string', { status: 400 })

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
-import { GradeRequest } from '@/types'
+import { requireUser } from '@/lib/api/auth'
+import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
+import { GradeRequest, GradeResponse } from '@/types'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+function isGradeResponse(value: unknown): value is GradeResponse {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return typeof v.correct === 'boolean'
+    && typeof v.score === 'number'
+    && typeof v.feedback === 'string'
+    && typeof v.correct_answer === 'string'
+}
 
 const STRICTNESS: Record<number, string> = {
   1: 'Lenient: accept if the core meaning is conveyed, ignore grammar/phrasing errors',
@@ -12,9 +19,9 @@ const STRICTNESS: Record<number, string> = {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireUser()
+  if (auth instanceof NextResponse) return auth
+  const { user, supabase } = auth
 
   const body: GradeRequest = await req.json()
   const { user_answer, sentence_zh, sentence_py, strictness, vocab_used } = body
@@ -35,13 +42,7 @@ Respond with ONLY valid JSON, no markdown:
 {"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"}`
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const raw = (message.content[0] as { type: string; text: string }).text.trim()
-    const parsed = JSON.parse(raw)
+    const parsed = await callClaudeJson(prompt, 200, isGradeResponse)
     parsed.correct = parsed.score >= 70
 
     // Tracking writes are fire-and-forget — never block or fail the grade response
@@ -71,6 +72,7 @@ Respond with ONLY valid JSON, no markdown:
     return NextResponse.json(parsed)
   } catch (err) {
     console.error('Grade error:', err)
-    return NextResponse.json({ error: 'Grading failed' }, { status: 500 })
+    const status = err instanceof ClaudeResponseError ? 502 : 500
+    return NextResponse.json({ error: 'Grading failed' }, { status })
   }
 }
