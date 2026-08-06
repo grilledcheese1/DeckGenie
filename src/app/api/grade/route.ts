@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { requireUser } from '@/lib/api/auth'
 import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
@@ -77,17 +78,20 @@ Respond with ONLY valid JSON, no markdown:
     const parsed = await callClaudeJson(prompt, 200, isGradeResponse)
     parsed.correct = parsed.score >= 70
 
-    // Tracking writes are fire-and-forget — never block or fail the grade response
-    if (vocab_used?.length) {
-      Promise.all(vocab_used.map((zh: string) =>
-        supabase.rpc('record_word_attempt', {
-          p_word_zh: zh,
-          p_correct: parsed.correct,
-        })
-      )).catch(err => console.error('record_word_attempt error:', err))
-    }
+    // Tracking writes must never block or fail the grade response, but they also
+    // can't be truly fire-and-forget — Vercel freezes the function once the
+    // response is sent, which was silently dropping these. waitUntil keeps the
+    // invocation alive until they finish without making the client wait for them.
+    const recordAttempts = vocab_used?.length
+      ? Promise.all(vocab_used.map((zh: string) =>
+          supabase.rpc('record_word_attempt', {
+            p_word_zh: zh,
+            p_correct: parsed.correct,
+          })
+        )).catch(err => console.error('record_word_attempt error:', err))
+      : Promise.resolve()
 
-    supabase.from('sentence_attempts').insert({
+    const insertAttempt = supabase.from('sentence_attempts').insert({
       user_id:         user.id,
       sentence_zh,
       sentence_py,
@@ -100,6 +104,8 @@ Respond with ONLY valid JSON, no markdown:
     }).then(({ error }) => {
       if (error) console.error('sentence_attempts insert error:', error.message)
     })
+
+    waitUntil(Promise.allSettled([recordAttempts, insertAttempt]))
 
     return NextResponse.json(parsed)
   } catch (err) {
