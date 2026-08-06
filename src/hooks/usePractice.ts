@@ -41,11 +41,9 @@ export function usePractice(strictness: number = 2) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          sentence_id: state.sentence.sentence_id,
           user_answer: state.userAnswer,
-          sentence_zh: state.sentence.sentence_zh,
-          sentence_py: state.sentence.sentence_py,
           strictness,
-          vocab_used: state.sentence.vocab_used,
         }),
       })
       if (!res.ok) throw new Error('Grade request failed')

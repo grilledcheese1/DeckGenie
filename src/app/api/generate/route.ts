@@ -4,7 +4,9 @@ import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GenerateResponse } from '@/types'
 
-function isGenerateResponse(value: unknown): value is GenerateResponse {
+type ClaudeSentence = Omit<GenerateResponse, 'sentence_id'>
+
+function isClaudeSentence(value: unknown): value is ClaudeSentence {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   return typeof v.sentence_zh === 'string'
@@ -68,8 +70,26 @@ Respond with ONLY valid JSON, no markdown:
 {"sentence_zh":"...","sentence_py":"...","vocab_used":["zh_word1","zh_word2"]}`
 
   try {
-    const parsed = await callClaudeJson(prompt, 256, isGenerateResponse)
-    return NextResponse.json(parsed)
+    const claudeSentence = await callClaudeJson(prompt, 256, isClaudeSentence)
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('generated_sentences')
+      .insert({
+        user_id:     user.id,
+        sentence_zh: claudeSentence.sentence_zh,
+        sentence_py: claudeSentence.sentence_py,
+        vocab_used:  claudeSentence.vocab_used,
+      })
+      .select('id')
+      .single()
+
+    if (insertError || !inserted) {
+      console.error('generated_sentences insert error:', insertError?.message)
+      return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    }
+
+    const response: GenerateResponse = { ...claudeSentence, sentence_id: inserted.id }
+    return NextResponse.json(response)
   } catch (err) {
     console.error('Generate error:', err)
     const status = err instanceof ClaudeResponseError ? 502 : 500
