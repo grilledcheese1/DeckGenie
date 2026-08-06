@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server'
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { requireUser } from '@/lib/api/auth'
+import { checkRateLimit } from '@/lib/api/ratelimit'
 
 const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
 
 export async function POST(req: Request) {
   const auth = await requireUser()
   if (auth instanceof NextResponse) return auth
+  const { user } = auth
+
+  const rateLimit = await checkRateLimit(user.id, 'speak')
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
 
   const { text } = await req.json()
   if (typeof text !== 'string') return new Response('text must be a string', { status: 400 })

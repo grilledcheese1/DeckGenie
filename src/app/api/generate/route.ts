@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/auth'
+import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GenerateResponse } from '@/types'
 
@@ -16,6 +17,14 @@ export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (auth instanceof NextResponse) return auth
   const { user, supabase } = auth
+
+  const rateLimit = await checkRateLimit(user.id, 'generate')
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
 
   let body: { recent?: Array<{ zh: string; py: string }> } = {}
   try { body = await req.json() } catch { /* no body */ }

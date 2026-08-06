@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/auth'
+import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GradeRequest, GradeResponse } from '@/types'
 
@@ -23,11 +24,28 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { user, supabase } = auth
 
+  const rateLimit = await checkRateLimit(user.id, 'grade')
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
+
   const body: GradeRequest = await req.json()
   const { user_answer, sentence_zh, sentence_py, strictness, vocab_used } = body
 
   if (!user_answer?.trim() || !sentence_zh) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  }
+
+  if (
+    user_answer.length > 500 ||
+    sentence_zh.length > 60 ||
+    sentence_py.length > 200 ||
+    (vocab_used?.length ?? 0) > 10
+  ) {
+    return NextResponse.json({ error: 'Input too large' }, { status: 400 })
   }
 
   const prompt = `You are grading a Chinese-to-English translation exercise.
