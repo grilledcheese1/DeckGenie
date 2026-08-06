@@ -3,6 +3,15 @@ import { requireUser } from '@/lib/api/auth'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GenerateResponse } from '@/types'
 
+function isGenerateResponse(value: unknown): value is GenerateResponse {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return typeof v.sentence_zh === 'string'
+    && typeof v.sentence_py === 'string'
+    && Array.isArray(v.vocab_used)
+    && v.vocab_used.every(w => typeof w === 'string')
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (auth instanceof NextResponse) return auth
@@ -50,7 +59,7 @@ Respond with ONLY valid JSON, no markdown:
 {"sentence_zh":"...","sentence_py":"...","vocab_used":["zh_word1","zh_word2"]}`
 
   try {
-    const parsed = await callClaudeJson<GenerateResponse>(prompt, 256)
+    const parsed = await callClaudeJson(prompt, 256, isGenerateResponse)
     return NextResponse.json(parsed)
   } catch (err) {
     console.error('Generate error:', err)

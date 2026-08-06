@@ -3,6 +3,15 @@ import { requireUser } from '@/lib/api/auth'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GradeRequest, GradeResponse } from '@/types'
 
+function isGradeResponse(value: unknown): value is GradeResponse {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return typeof v.correct === 'boolean'
+    && typeof v.score === 'number'
+    && typeof v.feedback === 'string'
+    && typeof v.correct_answer === 'string'
+}
+
 const STRICTNESS: Record<number, string> = {
   1: 'Lenient: accept if the core meaning is conveyed, ignore grammar/phrasing errors',
   2: 'Balanced: meaning must be clear and natural, minor phrasing differences are ok',
@@ -33,7 +42,7 @@ Respond with ONLY valid JSON, no markdown:
 {"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"}`
 
   try {
-    const parsed = await callClaudeJson<GradeResponse>(prompt, 200)
+    const parsed = await callClaudeJson(prompt, 200, isGradeResponse)
     parsed.correct = parsed.score >= 70
 
     // Tracking writes are fire-and-forget — never block or fail the grade response
