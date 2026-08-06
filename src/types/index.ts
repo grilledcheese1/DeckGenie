@@ -51,17 +51,16 @@ export interface CorpusWord {
 }
 
 export interface GenerateResponse {
+  sentence_id: string
   sentence_zh: string
   sentence_py: string
   vocab_used: string[]
 }
 
 export interface GradeRequest {
+  sentence_id: string
   user_answer: string
-  sentence_zh: string
-  sentence_py: string
   strictness: 1 | 2 | 3
-  vocab_used?: string[]
 }
 
 export interface GradeResponse {

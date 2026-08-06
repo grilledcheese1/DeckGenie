@@ -34,6 +34,10 @@ function loadDraft(userId: string): SessionDraft | null {
       localStorage.removeItem(DRAFT_KEY)
       return null
     }
+    if (typeof d.sentence?.sentence_id !== 'string' || !d.sentence.sentence_id) {
+      localStorage.removeItem(DRAFT_KEY)
+      return null
+    }
     return d
   } catch { return null }
 }
