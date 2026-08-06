@@ -143,7 +143,6 @@ export function useProgress() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.rpc('complete_round', {
-          p_user_id:           user.id,
           p_round_number:      summary.round_number,
           p_sentences_total:   summary.sentences_total,
           p_sentences_correct: summary.sentences_correct,
@@ -162,7 +161,7 @@ export function useProgress() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.rpc('claim_unlock', { p_user_id: user.id })
+        await supabase.rpc('claim_unlock')
         const { data } = await supabase.from('progress')
           .select('last_claimed_round')
           .eq('user_id', user.id)

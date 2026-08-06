@@ -48,7 +48,6 @@ Respond with ONLY valid JSON, no markdown:
     if (vocab_used?.length) {
       Promise.all(vocab_used.map(zh =>
         supabase.rpc('record_word_attempt', {
-          p_user_id: user.id,
           p_word_zh: zh,
           p_correct: parsed.correct,
         })
