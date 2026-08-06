@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+import { requireUser } from '@/lib/api/auth'
+import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
+import { GenerateResponse } from '@/types'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireUser()
+  if (auth instanceof NextResponse) return auth
+  const { user, supabase } = auth
 
   let body: { recent?: Array<{ zh: string; py: string }> } = {}
   try { body = await req.json() } catch { /* no body */ }
@@ -51,15 +50,11 @@ Respond with ONLY valid JSON, no markdown:
 {"sentence_zh":"...","sentence_py":"...","vocab_used":["zh_word1","zh_word2"]}`
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 256,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const raw = (message.content[0] as { type: string; text: string }).text.trim()
-    return NextResponse.json(JSON.parse(raw))
+    const parsed = await callClaudeJson<GenerateResponse>(prompt, 256)
+    return NextResponse.json(parsed)
   } catch (err) {
     console.error('Generate error:', err)
-    return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    const status = err instanceof ClaudeResponseError ? 502 : 500
+    return NextResponse.json({ error: 'Generation failed' }, { status })
   }
 }
