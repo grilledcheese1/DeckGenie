@@ -69,7 +69,6 @@ function PracticeInner() {
   const [showReview,    setShowReview]            = useState(false)
 
   const cardWrapRef      = useRef<HTMLDivElement>(null)
-  const navigatingRef    = useRef(false)
   const userIdRef        = useRef<string | null>(null)
   const clearedDraftRef  = useRef(false)
 
@@ -175,24 +174,7 @@ function PracticeInner() {
     setSentenceNum(1)
   }
 
-  async function goToDashboard() {
-    if (navigatingRef.current) return
-    navigatingRef.current = true
-    try {
-      const res = await fetch('/api/words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hsk_level: settings?.starting_hsk ?? 2,
-          count:     settings?.words_per_unlock ?? 5,
-        }),
-      })
-      if (!res.ok) console.error('Word unlock failed:', res.status, await res.text())
-    } catch (err) {
-      console.error('Word unlock error:', err)
-    } finally {
-      navigatingRef.current = false
-    }
+  function goToDashboard() {
     router.push('/dashboard')
   }
 

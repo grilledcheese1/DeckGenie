@@ -155,23 +155,10 @@ export function useProgress() {
   }
 
   async function claimUnlock() {
-    const r = progress?.rounds_completed ?? 0
-    setLastClaimedRound(r)
-    writeLocal(UNLOCK_CLAIMED_KEY, r)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await supabase.rpc('claim_unlock')
-        const { data } = await supabase.from('progress')
-          .select('last_claimed_round')
-          .eq('user_id', user.id)
-          .single()
-        if (data != null) {
-          setLastClaimedRound(data.last_claimed_round)
-          writeLocal(UNLOCK_CLAIMED_KEY, data.last_claimed_round)
-        }
-      }
-    } catch {}
+    // The actual claim now happens server-side (see /api/words), atomically
+    // with granting the words. This just resyncs local state with the
+    // authoritative last_claimed_round the server already wrote.
+    await load()
   }
 
   async function resetRoundCounter() {

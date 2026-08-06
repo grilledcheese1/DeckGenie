@@ -9,14 +9,35 @@ export async function POST(req: NextRequest) {
   const { user, supabase } = auth
 
   const body: WordsRequest = await req.json()
-  const { pos, topic, hsk_level, exclude_zh = [], count = 5 } = body
+  const { pos, topic, hsk_level: rawHskLevel, exclude_zh = [], count: rawCount = 5 } = body
 
-  const [{ data: settings }, { data: existing, error: existingError }] = await Promise.all([
-    supabase.from('settings').select('starting_hsk').eq('user_id', user.id).single(),
+  const count = Math.min(Math.max(1, rawCount), 20)
+  const hsk_level = rawHskLevel !== undefined
+    ? Math.min(Math.max(1, rawHskLevel), 6)
+    : undefined
+
+  const [{ data: settings }, { data: existing, error: existingError }, { data: progress }] = await Promise.all([
+    supabase.from('settings').select('starting_hsk, rounds_before_unlock').eq('user_id', user.id).single(),
     supabase.from('vocab_list').select('word_zh').eq('user_id', user.id),
+    supabase.from('progress').select('rounds_completed, last_claimed_round').eq('user_id', user.id).single(),
   ])
 
   if (existingError) return NextResponse.json({ error: 'Failed to read vocabulary' }, { status: 500 })
+
+  const isFirstRun = (existing ?? []).length === 0
+
+  if (!isFirstRun) {
+    const roundsCompleted = progress?.rounds_completed ?? 0
+    const lastClaimedRound = progress?.last_claimed_round ?? 0
+    const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
+    const entitled = roundsCompleted > 0
+      && roundsCompleted % roundsBeforeUnlock === 0
+      && roundsCompleted > lastClaimedRound
+
+    if (!entitled) {
+      return NextResponse.json({ error: 'No unlock available' }, { status: 403 })
+    }
+  }
 
   const ownedZh = (existing ?? []).map(r => r.word_zh)
   const allExcluded = Array.from(new Set([...exclude_zh, ...ownedZh]))
@@ -38,6 +59,15 @@ export async function POST(req: NextRequest) {
   }).slice(0, count)
 
   if (selected.length > 0) {
+    // Atomically re-verify entitlement and bump last_claimed_round (row-locked
+    // in the DB) before granting anything — the check above is for a clean
+    // error response, this is what actually prevents a double-submit race
+    // from claiming the same unlock twice.
+    const { error: claimError } = await supabase.rpc('claim_word_unlock')
+    if (claimError) {
+      return NextResponse.json({ error: 'No unlock available' }, { status: 403 })
+    }
+
     const rows = selected.map(w => ({
       user_id: user.id,
       word_zh: w.zh, pinyin: w.py, english: w.en,
