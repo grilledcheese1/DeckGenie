@@ -484,7 +484,25 @@ function PracticeInner() {
           </div>
         )}
 
-        {state.sentence && state.status !== 'loading' && (
+        {state.status === 'error' && (
+          <div
+            className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              {state.error || 'Something went wrong generating your sentence.'}
+            </p>
+            <button
+              onClick={() => fetchSentence()}
+              className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {state.sentence && state.status !== 'loading' && state.status !== 'error' && (
           <SentenceCard
             sentence={state.sentence}
             pinyinMode={state.pinyinMode}

@@ -10,26 +10,31 @@ export function usePractice(strictness: number = 2) {
     userAnswer: '',
     grade: null,
     status: 'loading',
+    error: null,
   })
   const recentRef = useRef<Array<{ zh: string; py: string }>>([])
 
   const fetchSentence = useCallback(async () => {
-    setState(prev => ({ ...prev, status: 'loading', grade: null, userAnswer: '', pinyinMode: 'hidden' }))
+    setState(prev => ({ ...prev, status: 'loading', grade: null, userAnswer: '', pinyinMode: 'hidden', error: null }))
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recent: recentRef.current }),
       })
-      if (!res.ok) throw new Error('Failed to generate')
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error || 'Failed to generate a sentence.')
+      }
       const data: GenerateResponse = await res.json()
       recentRef.current = [
         { zh: data.sentence_zh, py: data.sentence_py },
         ...recentRef.current,
       ].slice(0, 5)
       setState(prev => ({ ...prev, sentence: data, status: 'ready' }))
-    } catch {
-      setState(prev => ({ ...prev, status: 'ready' }))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate a sentence.'
+      setState(prev => ({ ...prev, status: 'error', error: message }))
     }
   }, [])
 
@@ -73,7 +78,7 @@ export function usePractice(strictness: number = 2) {
       { zh: draft.sentence.sentence_zh, py: draft.sentence.sentence_py },
       ...recentRef.current,
     ].slice(0, 5)
-    setState(draft)
+    setState({ ...draft, error: null })
   }, [])
 
   return { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence }

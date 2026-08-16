@@ -3,7 +3,14 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { requireUser } from '@/lib/api/auth'
 import { checkRateLimit } from '@/lib/api/ratelimit'
 
-const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
+let elevenlabs: ElevenLabsClient | undefined
+
+function getElevenLabsClient() {
+  if (!elevenlabs) {
+    elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
+  }
+  return elevenlabs
+}
 
 export async function POST(req: Request) {
   const auth = await requireUser()
@@ -25,7 +32,7 @@ export async function POST(req: Request) {
   if (trimmed.length > 2000) return new Response('text exceeds 2000 characters', { status: 400 })
 
   try {
-    const audio = await elevenlabs.textToSpeech.convert(
+    const audio = await getElevenLabsClient().textToSpeech.convert(
       process.env.ELEVENLABS_VOICE_ID!,
       { text: trimmed, modelId: process.env.ELEVENLABS_MODEL_ID }
     )

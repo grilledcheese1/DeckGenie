@@ -38,8 +38,10 @@ function SignupContent() {
       }
       setLoading(false)
     } else if (data.session) {
-      // Email confirmation is disabled — user is immediately logged in
-      window.location.href = '/dashboard'
+      // Email confirmation is disabled — user is immediately logged in.
+      // Brand-new account has no vocab yet, so route through onboarding to seed it
+      // (mirrors the /auth/callback OAuth path).
+      window.location.href = '/settings?firstRun=true'
     } else {
       // Email confirmation is enabled — confirmation email sent
       setConfirmationSent(true)
