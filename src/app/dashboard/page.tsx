@@ -6,6 +6,7 @@ import { gsap } from 'gsap'
 import { useProgress } from '@/hooks/useProgress'
 import { useVocabSheet } from '@/hooks/useVocabSheet'
 import { VocabSheet } from '@/components/vocab/VocabSheet'
+import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   } = useVocabSheet()
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [hasDraft, setHasDraft]   = useState(false)
   const [signMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
@@ -116,7 +118,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <button
-          onClick={() => router.push('/settings')}
+          onClick={() => setSettingsOpen(true)}
           className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover-border"
           style={{
             backgroundColor: 'var(--bg-secondary)',
@@ -279,6 +281,10 @@ export default function DashboardPage() {
           onRemove={removeWord}
           totalCount={vocabCount}
         />
+      )}
+
+      {settingsOpen && (
+        <SettingsPanel onClose={() => setSettingsOpen(false)} />
       )}
       </div>
     </div>

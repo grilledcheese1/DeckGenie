@@ -7,6 +7,7 @@ import { usePractice } from '@/hooks/usePractice'
 import { useProgress } from '@/hooks/useProgress'
 import { SentenceCard } from '@/components/practice/SentenceCard'
 import { UnlockModal } from '@/components/practice/UnlockModal'
+import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
 import { createClient } from '@/lib/supabase/client'
 import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
@@ -67,6 +68,7 @@ function PracticeInner() {
   const [roundSummary,  setRoundSummary]          = useState<RoundSummary | null>(null)
   const [showSummary,   setShowSummary]           = useState(false)
   const [showReview,    setShowReview]            = useState(false)
+  const [settingsOpen,  setSettingsOpen]          = useState(false)
 
   const cardWrapRef      = useRef<HTMLDivElement>(null)
   const userIdRef        = useRef<string | null>(null)
@@ -427,7 +429,7 @@ function PracticeInner() {
           <StreakFlame streak={currentStreak} />
 
           <button
-            onClick={() => router.push('/settings')}
+            onClick={() => setSettingsOpen(true)}
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover-border"
             style={{
               backgroundColor: 'var(--bg-secondary)',
@@ -585,6 +587,10 @@ function PracticeInner() {
           wrongAnswers={roundSummary.wrongAnswers}
           onDone={goToDashboard}
         />
+      )}
+
+      {settingsOpen && (
+        <SettingsPanel onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   )
