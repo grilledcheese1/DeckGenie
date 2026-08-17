@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Settings } from '@/types'
 import { ThemePicker } from '@/components/ui/ThemePicker'
@@ -39,30 +39,38 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [theme, setTheme] = useState<ThemeId>('ink-jade')
+  const [loaded, setLoaded] = useState(false)
 
-  const loadSettings = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).single()
-        if (data) {
-          setSettings(data)
-          localStorage.setItem('hanzi_settings', JSON.stringify(data))
-          return
+  useEffect(() => {
+    let cancelled = false
+    async function loadSettings() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).single()
+          if (data) {
+            if (!cancelled) {
+              setSettings(data)
+              localStorage.setItem('hanzi_settings', JSON.stringify(data))
+              setLoaded(true)
+            }
+            return
+          }
         }
-      }
-    } catch {}
-    const cached = localStorage.getItem('hanzi_settings')
-    if (cached) { try { setSettings(JSON.parse(cached)) } catch {} }
+      } catch {}
+      if (cancelled) return
+      const cached = localStorage.getItem('hanzi_settings')
+      if (cached) { try { setSettings(JSON.parse(cached)) } catch {} }
+      setLoaded(true)
+    }
+    loadSettings()
+    return () => { cancelled = true }
   }, [supabase])
-
-  useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { setTheme(loadSavedTheme()) }, [])
 
   async function handleSave() {
     setSaving(true)
     setSaveError('')
-    localStorage.setItem('hanzi_settings', JSON.stringify(settings))
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -70,6 +78,7 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
         if (error) { setSaveError(error.message); setSaving(false); return }
       }
     } catch (e) { setSaveError(String(e)); setSaving(false); return }
+    localStorage.setItem('hanzi_settings', JSON.stringify(settings))
     if (isFirstRun) {
       try {
         await fetch('/api/words', {
@@ -121,6 +130,17 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
         )}
       </div>
 
+      {!loaded && (
+        <div className="flex justify-center py-12">
+          <div
+            className="w-5 h-5 rounded-full animate-spin"
+            style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+          />
+        </div>
+      )}
+
+      {loaded && (
+      <>
       <div className="space-y-8">
         {/* HSK level */}
         <section>
@@ -294,6 +314,8 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
             : isFirstRun ? 'Start practicing →' : 'Save settings'}
         </button>
       </div>
+      </>
+      )}
     </>
   )
 }

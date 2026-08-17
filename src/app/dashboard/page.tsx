@@ -14,7 +14,7 @@ import { NeonSignH } from '@/components/ui/NeonSignH'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { progress, settings, vocabCount, loading, canUnlock } = useProgress()
+  const { progress, settings, vocabCount, loading, canUnlock, reload } = useProgress()
   const {
     words, loading: vocabLoading, hasMore, filters,
     open: openVocab, loadMore, applyFilter, removeWord,
@@ -284,7 +284,7 @@ export default function DashboardPage() {
       )}
 
       {settingsOpen && (
-        <SettingsPanel onClose={() => setSettingsOpen(false)} />
+        <SettingsPanel onClose={() => { reload(); setSettingsOpen(false) }} />
       )}
       </div>
     </div>

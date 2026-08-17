@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { SettingsForm } from './SettingsForm'
 
@@ -26,11 +26,19 @@ export function SettingsPanel({ onClose }: Props) {
     return () => ctx.revert()
   }, [])
 
-  function handleClose() {
+  const handleClose = useCallback(() => {
     const tl = gsap.timeline({ onComplete: onClose })
     tl.to(panelRef.current, { x: '100%', duration: 0.35, ease: 'power3.in' })
     tl.to(overlayRef.current, { opacity: 0, duration: 0.2 }, '-=0.2')
-  }
+  }, [onClose])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleClose])
 
   return (
     <div
@@ -41,6 +49,9 @@ export function SettingsPanel({ onClose }: Props) {
     >
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
         className="w-full sm:max-w-[420px] h-full overflow-y-auto px-4 py-10"
         style={{ backgroundColor: 'var(--bg-primary)' }}
       >
