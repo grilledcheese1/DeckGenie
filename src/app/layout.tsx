@@ -6,7 +6,7 @@ const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans', display: '
 const notoSerifSC = Noto_Serif_SC({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-hanzi', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: '汉字练习 — Chinese Vocab Practice',
+  title: '音吉 — Chinese Vocab Practice',
   description: 'Learn Chinese vocabulary with AI-powered sentence practice',
 }
 

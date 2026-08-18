@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode } from '@/types'
+import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode, Settings } from '@/types'
+import { getApiKey } from '@/lib/byoKey'
 
-export function usePractice(strictness: number = 2) {
+export function usePractice(strictness: number = 2, practiceMode: Settings['practice_mode'] = 'static') {
   const [state, setState] = useState<SentenceState>({
     sentence: null,
     pinyinMode: 'hidden',
@@ -16,10 +17,20 @@ export function usePractice(strictness: number = 2) {
 
   const fetchSentence = useCallback(async () => {
     setState(prev => ({ ...prev, status: 'loading', grade: null, userAnswer: '', pinyinMode: 'hidden', error: null }))
+    let apiKey: string | null = null
+    if (practiceMode === 'ai') {
+      apiKey = getApiKey()
+      if (!apiKey) {
+        setState(prev => ({ ...prev, status: 'error', error: 'Add your Anthropic API key in Settings.' }))
+        return
+      }
+    }
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) headers['X-Anthropic-Key'] = apiKey
       const res = await fetch('/api/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ recent: recentRef.current }),
       })
       if (!res.ok) {
@@ -36,15 +47,25 @@ export function usePractice(strictness: number = 2) {
       const message = err instanceof Error ? err.message : 'Failed to generate a sentence.'
       setState(prev => ({ ...prev, status: 'error', error: message }))
     }
-  }, [])
+  }, [practiceMode])
 
   const submitAnswer = useCallback(async () => {
     if (!state.sentence || !state.userAnswer.trim()) return
+    let apiKey: string | null = null
+    if (practiceMode === 'ai') {
+      apiKey = getApiKey()
+      if (!apiKey) {
+        setState(prev => ({ ...prev, status: 'error', error: 'Add your Anthropic API key in Settings.' }))
+        return
+      }
+    }
     setState(prev => ({ ...prev, status: 'submitted' }))
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) headers['X-Anthropic-Key'] = apiKey
       const res = await fetch('/api/grade', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           sentence_id: state.sentence.sentence_id,
           user_answer: state.userAnswer,
@@ -57,7 +78,7 @@ export function usePractice(strictness: number = 2) {
     } catch {
       setState(prev => ({ ...prev, status: 'ready' }))
     }
-  }, [state.sentence, state.userAnswer, strictness])
+  }, [state.sentence, state.userAnswer, strictness, practiceMode])
 
   const togglePinyin = useCallback(() => {
     setState(prev => ({ ...prev, pinyinMode: prev.pinyinMode === 'hidden' ? 'showing' : 'hidden' }))

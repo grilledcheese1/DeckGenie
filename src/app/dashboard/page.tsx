@@ -112,7 +112,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="dash-card flex items-center justify-between mb-10">
         <div>
-          <p className="font-hanzi text-3xl" style={{ color: 'var(--hanzi-color)' }}>汉字练习</p>
+          <p className="font-hanzi text-3xl" style={{ color: 'var(--hanzi-color)' }}>音吉</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
             HSK {settings?.starting_hsk ?? 1} · {vocabCount} words active
           </p>

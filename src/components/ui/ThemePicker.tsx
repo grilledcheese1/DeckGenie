@@ -49,7 +49,7 @@ export function ThemePicker({ selected, onChange }: Props) {
                   className="font-hanzi text-base leading-none mb-1.5"
                   style={{ color: p.hanzi }}
                 >
-                  汉字
+                  音吉
                 </div>
 
                 {/* Mock card */}

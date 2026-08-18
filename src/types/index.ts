@@ -8,6 +8,7 @@ export interface Settings {
   words_per_unlock: number
   show_pinyin: 'always' | 'tap' | 'never'
   show_hints: 'before' | 'after' | 'never'
+  practice_mode: 'ai' | 'static'
   created_at: string
   updated_at: string
 }
@@ -48,6 +49,18 @@ export interface CorpusWord {
   pos: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other'
   topic: string
   hsk: 1 | 2 | 3 | 4 | 5 | 6
+}
+
+export interface CorpusSentence {
+  id: string
+  sentence_zh: string
+  sentence_py: string
+  canonical_en: string
+  vocab_used: string[]
+  hsk_level: 1 | 2 | 3 | 4 | 5 | 6
+  pos: string | null
+  topic: string | null
+  created_at: string
 }
 
 export interface GenerateResponse {

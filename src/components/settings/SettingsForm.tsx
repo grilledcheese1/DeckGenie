@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Settings } from '@/types'
 import { ThemePicker } from '@/components/ui/ThemePicker'
 import { loadSavedTheme, type ThemeId } from '@/lib/theme'
+import { saveApiKey, getApiKey } from '@/lib/byoKey'
 
 const HSK_DESCRIPTIONS: Record<number, string> = {
   1: 'Complete beginner — ~150 basic words',
@@ -35,11 +36,16 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
     starting_hsk: 2, strictness: 2, sentences_per_round: 10,
     rounds_before_unlock: 3, words_per_unlock: 5,
     show_pinyin: 'tap', show_hints: 'after',
+    practice_mode: 'static',
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [theme, setTheme] = useState<ThemeId>('ink-jade')
   const [loaded, setLoaded] = useState(false)
+
+  // API key is local-only — persisted to localStorage, never to Supabase.
+  const [apiKey, setApiKey] = useState('')
+  const [keyStatus, setKeyStatus] = useState<'untested' | 'testing' | 'valid' | 'invalid'>('untested')
 
   useEffect(() => {
     let cancelled = false
@@ -67,6 +73,7 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
     return () => { cancelled = true }
   }, [supabase])
   useEffect(() => { setTheme(loadSavedTheme()) }, [])
+  useEffect(() => { const stored = getApiKey(); if (stored) setApiKey(stored) }, [])
 
   async function handleSave() {
     setSaving(true)
@@ -95,6 +102,22 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
+  async function testApiKey() {
+    if (!apiKey.trim()) return
+    setKeyStatus('testing')
+    try {
+      const res = await fetch('/api/validate-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
+      })
+      const data = await res.json()
+      setKeyStatus(data?.valid ? 'valid' : 'invalid')
+    } catch {
+      setKeyStatus('invalid')
+    }
+  }
+
   const selectedChip: React.CSSProperties = {
     backgroundColor: 'var(--accent-subtle)',
     border: '1px solid var(--accent)',
@@ -120,7 +143,7 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
         )}
         <h1 className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
           {isFirstRun
-            ? <span>Welcome to <span className="font-hanzi" style={{ color: 'var(--hanzi-color)' }}>汉字练习</span></span>
+            ? <span>Welcome to <span className="font-hanzi" style={{ color: 'var(--hanzi-color)' }}>音吉</span></span>
             : 'Settings'}
         </h1>
         {isFirstRun && (
@@ -190,6 +213,79 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
               )
             })}
           </div>
+        </section>
+
+        {/* Practice mode */}
+        <section>
+          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
+            Practice mode
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { value: 'static' as const, label: 'Free sentences', desc: 'Pre-written sentences, no key needed' },
+              { value: 'ai' as const, label: 'My own Anthropic API key', desc: 'AI-generated sentences using your key' },
+            ]).map(({ value, label, desc }) => {
+              const isSelected = settings.practice_mode === value
+              return (
+                <button
+                  key={value}
+                  onClick={() => update('practice_mode', value)}
+                  className="rounded-xl p-3 text-left transition-all hover-border"
+                  style={isSelected ? selectedChip : unselectedChip}
+                >
+                  <p className="text-sm font-medium" style={{ color: isSelected ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                    {label}
+                  </p>
+                  <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-tertiary)' }}>
+                    {desc}
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+
+          {settings.practice_mode === 'ai' && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => {
+                    setApiKey(e.target.value)
+                    saveApiKey(e.target.value)
+                    setKeyStatus('untested')
+                  }}
+                  placeholder="sk-ant-..."
+                  className="flex-1 rounded-xl px-3 py-2.5 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                />
+                <button
+                  onClick={testApiKey}
+                  disabled={!apiKey.trim() || keyStatus === 'testing'}
+                  className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover-border disabled:opacity-50"
+                  style={unselectedChip}
+                >
+                  {keyStatus === 'testing' ? 'Testing…' : 'Test key'}
+                </button>
+              </div>
+              {keyStatus !== 'untested' && (
+                <p
+                  className="text-xs"
+                  style={{
+                    color: keyStatus === 'valid'
+                      ? 'var(--accent-text)'
+                      : keyStatus === 'invalid'
+                        ? 'var(--error-text)'
+                        : 'var(--text-tertiary)',
+                  }}
+                >
+                  {keyStatus === 'testing' && 'Checking key…'}
+                  {keyStatus === 'valid' && 'Key is valid'}
+                  {keyStatus === 'invalid' && 'Key is invalid'}
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Session */}

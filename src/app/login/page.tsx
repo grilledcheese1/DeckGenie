@@ -72,7 +72,7 @@ function LoginContent() {
       <div className="w-full max-w-sm relative" style={{ zIndex: 1 }}>
         {/* Logo */}
         <div className="text-center mb-8">
-          <p className="font-hanzi text-5xl mb-2" style={{ color: 'var(--hanzi-color)' }}>汉字</p>
+          <p className="font-hanzi text-5xl mb-2" style={{ color: 'var(--hanzi-color)' }}>音吉</p>
           <p className="text-sm tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Practice</p>
         </div>
 

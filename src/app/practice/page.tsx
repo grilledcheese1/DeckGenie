@@ -52,7 +52,7 @@ function PracticeInner() {
   const startUnlock   = searchParams.get('unlock') === 'true'
 
   const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock, reload } = useProgress()
-  const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence } = usePractice(settings?.strictness ?? 2)
+  const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence } = usePractice(settings?.strictness ?? 2, settings?.practice_mode ?? 'static')
 
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
   const [roundJustComplete, setRoundJustComplete] = useState(false)

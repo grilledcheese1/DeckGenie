@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:sentences": "tsx --env-file=.env.local scripts/seed-sentence-bank.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
@@ -17,7 +18,7 @@
     "@upstash/redis": "^1.38.2",
     "@vercel/functions": "^3.8.0",
     "gsap": "^3.15.0",
-    "next": "16.2.6",
+    "next": "^16.3.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -28,8 +29,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "supabase": "^2.111.0",
+    "supabase": "^2.114.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }

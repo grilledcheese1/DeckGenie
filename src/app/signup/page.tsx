@@ -73,7 +73,7 @@ function SignupContent() {
           <NeonSign english="PROGRESS" chinese="进步" color="#ffb800" glowColor={signMode === 'neon' ? "rgba(255,184,0,0.35)" : undefined}  size={1} delay={2.8} mode={signMode} className="absolute" style={{ left: '6%',  bottom: '12%' }} />
         </div>
         <div className="w-full max-w-sm text-center relative" style={{ zIndex: 1 }}>
-          <p className="font-hanzi text-5xl mb-6" style={{ color: 'var(--hanzi-color)' }}>汉字</p>
+          <p className="font-hanzi text-5xl mb-6" style={{ color: 'var(--hanzi-color)' }}>音吉</p>
           <div
             className="rounded-2xl p-6"
             style={{
@@ -118,7 +118,7 @@ function SignupContent() {
       <div className="w-full max-w-sm relative" style={{ zIndex: 1 }}>
         {/* Logo */}
         <div className="text-center mb-8">
-          <p className="font-hanzi text-5xl mb-2" style={{ color: 'var(--hanzi-color)' }}>汉字</p>
+          <p className="font-hanzi text-5xl mb-2" style={{ color: 'var(--hanzi-color)' }}>音吉</p>
           <p className="text-sm tracking-widest uppercase" style={{ color: 'var(--text-tertiary)' }}>Create account</p>
         </div>
 
