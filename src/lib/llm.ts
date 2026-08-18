@@ -14,11 +14,12 @@ export class ClaudeResponseError extends Error {
 export async function callClaudeJson<T>(
   prompt: string,
   maxTokens: number,
-  validate: (value: unknown) => value is T
+  validate: (value: unknown) => value is T,
+  client: Anthropic = anthropic
 ): Promise<T> {
   let message
   try {
-    message = await anthropic.messages.create({
+    message = await client.messages.create({
       model: MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
