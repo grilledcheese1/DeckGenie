@@ -8,6 +8,7 @@ function SettingsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isFirstRun = searchParams.get('firstRun') === 'true'
+  const highlightApiKey = searchParams.get('focus') === 'apikey'
 
   return (
     <div className="min-h-screen px-4 py-10 max-w-lg mx-auto">
@@ -15,6 +16,7 @@ function SettingsInner() {
         mode={isFirstRun ? 'onboarding' : 'edit'}
         onDone={() => router.push('/dashboard')}
         onBack={isFirstRun ? undefined : () => router.back()}
+        highlightApiKey={highlightApiKey}
       />
     </div>
   )

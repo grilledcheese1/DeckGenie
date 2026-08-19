@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Settings } from '@/types'
 import { ThemePicker } from '@/components/ui/ThemePicker'
@@ -26,9 +26,10 @@ interface Props {
   mode: 'onboarding' | 'edit'
   onDone: () => void
   onBack?: () => void
+  highlightApiKey?: boolean
 }
 
-export function SettingsForm({ mode, onDone, onBack }: Props) {
+export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   const isFirstRun = mode === 'onboarding'
   const supabase = createClient()
 
@@ -46,6 +47,9 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
   // API key is local-only — persisted to localStorage, never to Supabase.
   const [apiKey, setApiKey] = useState('')
   const [keyStatus, setKeyStatus] = useState<'untested' | 'testing' | 'valid' | 'invalid'>('untested')
+  const [keyHighlighted, setKeyHighlighted] = useState(false)
+  const apiKeySectionRef = useRef<HTMLDivElement>(null)
+  const apiKeyInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -74,6 +78,19 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
   }, [supabase])
   useEffect(() => { setTheme(loadSavedTheme()) }, [])
   useEffect(() => { const stored = getApiKey(); if (stored) setApiKey(stored) }, [])
+
+  // Scroll/focus/highlight the API key input when arriving via a redirect
+  // that needs it (e.g. practice page bounced the user here for a missing
+  // key). Only makes sense once the real practice_mode has loaded and is
+  // actually 'ai' — otherwise the input isn't even rendered yet.
+  useEffect(() => {
+    if (!loaded || !highlightApiKey || settings.practice_mode !== 'ai') return
+    apiKeySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    apiKeyInputRef.current?.focus()
+    setKeyHighlighted(true)
+    const timer = setTimeout(() => setKeyHighlighted(false), 2500)
+    return () => clearTimeout(timer)
+  }, [loaded, highlightApiKey, settings.practice_mode])
 
   async function handleSave() {
     setSaving(true)
@@ -245,9 +262,14 @@ export function SettingsForm({ mode, onDone, onBack }: Props) {
           </div>
 
           {settings.practice_mode === 'ai' && (
-            <div className="mt-3 space-y-2">
+            <div
+              ref={apiKeySectionRef}
+              className="mt-3 space-y-2 rounded-xl transition-shadow"
+              style={keyHighlighted ? { boxShadow: '0 0 0 3px var(--accent-subtle), 0 0 0 1px var(--accent)' } : undefined}
+            >
               <div className="flex gap-2">
                 <input
+                  ref={apiKeyInputRef}
                   type="password"
                   value={apiKey}
                   onChange={(e) => {
