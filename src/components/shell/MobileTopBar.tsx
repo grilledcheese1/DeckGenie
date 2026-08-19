@@ -1,5 +1,7 @@
 'use client'
 
+import { Wordmark } from './Wordmark'
+
 interface Props {
   onMenuClick: () => void
 }
@@ -28,9 +30,7 @@ export function MobileTopBar({ onMenuClick }: Props) {
         </svg>
       </button>
 
-      <p className="font-semibold tracking-tight text-base" style={{ color: 'var(--text-primary)' }}>
-        inkitsu
-      </p>
+      <Wordmark subtitle={false} size="base" />
     </header>
   )
 }
