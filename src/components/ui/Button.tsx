@@ -95,7 +95,7 @@ function variantStyle(variant: ButtonVariant): { style: React.CSSProperties; hov
  * InkButton automatically — no per-page GSAP code needed.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'primary', size = 'md', icon, className = '', style, children, onClick, ...rest },
+  { variant = 'primary', size = 'md', icon, className = '', style, children, onClick, type = 'button', ...rest },
   ref
 ) {
   const inkRef = useRef<InkButtonHandle>(null)
@@ -112,6 +112,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={`${BASE_CLASSES} ${SIZE_CLASSES[size]} ${hoverClass} ${className}`}
       style={{ ...variantStyles, ...style }}
       onClick={handleClick}
+      type={type}
       {...rest}
     >
       {icon === 'ink' && <InkButton ref={inkRef} size={size === 'sm' ? 14 : 16} />}

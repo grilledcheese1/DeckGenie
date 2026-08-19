@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 
 export interface TextInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
@@ -15,16 +15,21 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
   { label, className = '', style, id, onFocus, onBlur, ...rest },
   ref
 ) {
+  // Falls back to a generated id so <label htmlFor> stays correctly
+  // associated with the input even when the caller doesn't pass one.
+  const autoId = useId()
+  const inputId = id ?? autoId
+
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
+        <label htmlFor={inputId} className="block text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
           {label}
         </label>
       )}
       <input
         ref={ref}
-        id={id}
+        id={inputId}
         className={`w-full rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors ${className}`}
         style={{
           backgroundColor: 'var(--input-bg)',

@@ -30,33 +30,49 @@ export const InkButton = forwardRef<InkButtonHandle, InkButtonProps>(function In
 ) {
   const ringRef   = useRef<SVGPathElement>(null)
   const splashRef = useRef<SVGCircleElement>(null)
+  // Both the mount-time stroke draw and any later click "pulse" tweens live
+  // in one gsap.context(), so a single ctx.revert() on unmount cleans up
+  // whichever tween(s) happen to be running — e.g. a "Done →" button that
+  // navigates away mid-pulse. Matches the gsap.context()/ctx.revert()
+  // convention used elsewhere in this codebase (VocabSheet.tsx,
+  // UnlockModal.tsx, SessionSummary.tsx).
+  const ctxRef = useRef<gsap.Context | null>(null)
 
   // Draw the ring in once on mount. Empty dep array is deliberate — this is a
   // "used dozens of times per session" button; re-triggering the stroke draw
   // on every re-render (e.g. parent state changes) would feel busy.
   useEffect(() => {
-    const path = ringRef.current
-    if (!path) return
-    const length = path.getTotalLength()
-    gsap.set(path, { strokeDasharray: length })
-    const tween = gsap.fromTo(
-      path,
-      { strokeDashoffset: length },
-      { strokeDashoffset: 0, duration: 0.6, ease: 'power2.out' }
-    )
-    return () => { tween.kill() }
+    const ctx = gsap.context(() => {
+      const path = ringRef.current
+      if (!path) return
+      const length = path.getTotalLength()
+      gsap.set(path, { strokeDasharray: length })
+      gsap.fromTo(
+        path,
+        { strokeDashoffset: length },
+        { strokeDashoffset: 0, duration: 0.6, ease: 'power2.out' }
+      )
+    })
+    ctxRef.current = ctx
+    return () => {
+      ctx.revert()
+      ctxRef.current = null
+    }
   }, [])
 
   useImperativeHandle(ref, () => ({
     pulse() {
       const splash = splashRef.current
-      if (!splash) return
-      gsap.killTweensOf(splash)
-      gsap.fromTo(
-        splash,
-        { scale: 0.4, opacity: 0.6, transformOrigin: '50% 50%' },
-        { scale: 1.6, opacity: 0, duration: 0.45, ease: 'power2.out' }
-      )
+      const ctx = ctxRef.current
+      if (!splash || !ctx) return
+      ctx.add(() => {
+        gsap.killTweensOf(splash)
+        gsap.fromTo(
+          splash,
+          { scale: 0.4, opacity: 0.6, transformOrigin: '50% 50%' },
+          { scale: 1.6, opacity: 0, duration: 0.45, ease: 'power2.out' }
+        )
+      })
     },
   }), [])
 
