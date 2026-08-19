@@ -70,9 +70,23 @@ export function getTheme(id: string): Theme {
   return THEMES.find(t => t.id === id) ?? THEMES[0]
 }
 
+// Fired whenever the theme changes so already-mounted components that
+// derived something from the theme at mount time (e.g. dashboard's neon
+// sign colors) can stay in sync instead of freezing at whatever the theme
+// was when they first rendered.
+export const THEME_CHANGE_EVENT = 'hanzi-theme-change'
+
 export function applyTheme(id: ThemeId) {
   document.documentElement.setAttribute('data-theme', id)
   localStorage.setItem('hanzi-theme', id)
+  window.dispatchEvent(new CustomEvent<ThemeId>(THEME_CHANGE_EVENT, { detail: id }))
+}
+
+// Maps a theme to the neon-sign visual mode that matches it. Shared so every
+// call site derives this the same way instead of re-deriving the mapping
+// (and risking drift) at each usage.
+export function themeToSignMode(id: ThemeId): 'neon' | 'vermillion' | 'bamboo' {
+  return id === 'vermillion-cream' ? 'vermillion' : id === 'bamboo-light' ? 'bamboo' : 'neon'
 }
 
 export function loadSavedTheme(): ThemeId {

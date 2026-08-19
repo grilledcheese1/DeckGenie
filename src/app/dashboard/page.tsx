@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
 import { NeonSignH } from '@/components/ui/NeonSignH'
+import { THEME_CHANGE_EVENT, themeToSignMode, type ThemeId } from '@/lib/theme'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -23,13 +24,24 @@ export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [hasDraft, setHasDraft]   = useState(false)
-  const [signMode] = useState<SignMode>(() => {
+  const [signMode, setSignMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
-    const saved = localStorage.getItem('hanzi-theme') ?? 'ink-jade'
-    return saved === 'vermillion-cream' ? 'vermillion' :
-           saved === 'bamboo-light'     ? 'bamboo'     : 'neon'
+    const saved = (localStorage.getItem('hanzi-theme') ?? 'ink-jade') as ThemeId
+    return themeToSignMode(saved)
   })
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // signMode above is only captured once, at mount — without this, changing
+  // the theme in Settings (which applies live, before/without needing Save)
+  // leaves the neon signs frozen on whatever theme was active on page load,
+  // mismatched against the rest of the now-recolored page.
+  useEffect(() => {
+    function onThemeChange(e: Event) {
+      setSignMode(themeToSignMode((e as CustomEvent<ThemeId>).detail))
+    }
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange)
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange)
+  }, [])
 
   useEffect(() => {
     async function checkDraft() {
@@ -101,7 +113,7 @@ export default function DashboardPage() {
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.13, zIndex: 0 }} aria-hidden="true">
         <NeonSign english="MASTER"    chinese="融会贯通 " color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0}   mode={signMode} className="absolute" style={{ left: '-28%',  top: '8%' }} />
         <NeonSign english="PERSIST"  chinese="坚持" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={2.5} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-51%' }} />
-        <NeonSign english="DECKGENIE"  chinese="甲板精灵" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1.7} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-48%' }} />
+        <NeonSign english="INKITSU"  chinese="音吉" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1.7} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-48%' }} />
 
         <NeonSign english="LEARNING" chinese="沉浸式学习" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={3.3} delay={1.3} mode={signMode} className="absolute" style={{ left: '40%',  bottom: '120%' }} />
         <NeonSign english="CULTIVATION" chinese="语感培养" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={2.3} delay={1.8} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '126%' }} />
