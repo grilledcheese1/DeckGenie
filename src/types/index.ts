@@ -119,7 +119,7 @@ export interface SentenceState {
   pinyinMode: PinyinMode
   userAnswer: string
   grade: GradeResponse | null
-  status: 'loading' | 'ready' | 'submitted' | 'graded' | 'error'
+  status: 'loading' | 'ready' | 'submitted' | 'graded' | 'error' | 'no_content'
   error: string | null
 }
 

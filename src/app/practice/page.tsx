@@ -10,6 +10,7 @@ import { UnlockModal } from '@/components/practice/UnlockModal'
 import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
 import { createClient } from '@/lib/supabase/client'
+import { getApiKey } from '@/lib/byoKey'
 import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
 import { SessionSummary } from '@/components/practice/SessionSummary'
 import { ReviewScreen }   from '@/components/practice/ReviewScreen'
@@ -51,7 +52,7 @@ function PracticeInner() {
   const searchParams  = useSearchParams()
   const startUnlock   = searchParams.get('unlock') === 'true'
 
-  const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock, reload } = useProgress()
+  const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock, canUnlock, reload } = useProgress()
   const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence } = usePractice(settings?.strictness ?? 2, settings?.practice_mode ?? 'static')
 
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
@@ -73,6 +74,7 @@ function PracticeInner() {
   const cardWrapRef      = useRef<HTMLDivElement>(null)
   const userIdRef        = useRef<string | null>(null)
   const clearedDraftRef  = useRef(false)
+  const initedRef        = useRef(false)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -82,11 +84,26 @@ function PracticeInner() {
   useEffect(() => { setTheme(loadSavedTheme()) }, [])
 
   useEffect(() => {
+    // Gated on settings (rather than firing unconditionally on mount) so the
+    // ai-mode-no-key check below reads the real practice_mode instead of
+    // usePractice's 'static' fallback default, and so a missing key redirects
+    // before a doomed generate request ever fires. initedRef keeps this body
+    // running exactly once even though `settings` is re-set (new reference)
+    // on every reload().
+    if (!settings || initedRef.current) return
+    initedRef.current = true
+
     async function init() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       userIdRef.current = user.id
+
+      if (settings!.practice_mode === 'ai' && !getApiKey()) {
+        router.push('/settings?focus=apikey')
+        return
+      }
+
       const { data } = await supabase.from('vocab_list').select('*').eq('user_id', user.id)
       setVocabList(data ?? [])
       if (startUnlock) return
@@ -110,7 +127,7 @@ function PracticeInner() {
       }
     }
     init()
-  }, []) // eslint-disable-line
+  }, [settings]) // eslint-disable-line
 
   useEffect(() => {
     if (state.status === 'graded' && state.grade) {
@@ -426,6 +443,17 @@ function PracticeInner() {
             {vocabCount} words
           </span>
 
+          <span
+            className="text-xs px-2 py-0.5 rounded-full"
+            style={{
+              color: settings?.practice_mode === 'ai' ? 'var(--accent-text)' : 'var(--text-tertiary)',
+              backgroundColor: settings?.practice_mode === 'ai' ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+              border: '0.5px solid var(--border)',
+            }}
+          >
+            {settings?.practice_mode === 'ai' ? 'AI mode' : 'Free mode'}
+          </span>
+
           <StreakFlame streak={currentStreak} />
 
           <button
@@ -504,7 +532,40 @@ function PracticeInner() {
           </div>
         )}
 
-        {state.sentence && state.status !== 'loading' && state.status !== 'error' && (
+        {state.status === 'no_content' && (
+          <div
+            className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              We&apos;re out of practice sentences for your current words — try unlocking more, or switch to AI mode in Settings.
+            </p>
+            <div className="flex gap-2">
+              {canUnlock && (
+                <button
+                  onClick={() => setShowUnlock(true)}
+                  className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
+                  style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                >
+                  Unlock more words
+                </button>
+              )}
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-bg hover-border"
+                style={{
+                  backgroundColor: canUnlock ? 'transparent' : 'var(--accent)',
+                  border: canUnlock ? '1px solid var(--border)' : 'none',
+                  color: canUnlock ? 'var(--text-secondary)' : 'white',
+                }}
+              >
+                Open settings
+              </button>
+            </div>
+          </div>
+        )}
+
+        {state.sentence && state.status !== 'loading' && state.status !== 'error' && state.status !== 'no_content' && (
           <SentenceCard
             sentence={state.sentence}
             pinyinMode={state.pinyinMode}
