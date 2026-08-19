@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { requireUser } from '@/lib/api/auth'
 import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
+import { selectStaticSentence } from '@/lib/staticSentences'
 import { GenerateResponse } from '@/types'
 
 type ClaudeSentence = Omit<GenerateResponse, 'sentence_id'>
@@ -14,6 +16,13 @@ function isClaudeSentence(value: unknown): value is ClaudeSentence {
     && Array.isArray(v.vocab_used)
     && v.vocab_used.every(w => typeof w === 'string')
 }
+
+// recent entries are echoed back by the client from prior responses — the
+// declared request body type is a compile-time assertion only, not runtime
+// validation of req.json()'s actual (any-typed) result. Every entry ends up
+// either in a Supabase filter or interpolated into the LLM prompt, so
+// malformed/oversized values must be dropped and bounded here.
+const MAX_RECENT_FIELD_LENGTH = 200
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser()
@@ -30,7 +39,63 @@ export async function POST(req: NextRequest) {
 
   let body: { recent?: Array<{ zh: string; py: string }> } = {}
   try { body = await req.json() } catch { /* no body */ }
-  const recent = Array.isArray(body?.recent) ? body.recent.slice(0, 5) : []
+  const rawRecent = Array.isArray(body?.recent) ? body.recent.slice(0, 5) : []
+  const recent = rawRecent
+    .filter((r): r is { zh: string; py: string } => typeof r?.zh === 'string' && typeof r?.py === 'string')
+    .map(r => ({
+      zh: r.zh.slice(0, MAX_RECENT_FIELD_LENGTH),
+      py: r.py.slice(0, MAX_RECENT_FIELD_LENGTH),
+    }))
+
+  const { data: userSettings } = await supabase
+    .from('settings')
+    .select('practice_mode')
+    .eq('user_id', user.id)
+    .single()
+
+  const practiceMode = userSettings?.practice_mode ?? 'static'
+
+  if (practiceMode === 'static') {
+    // The client's variety-tracking sends recently-served {zh, py} pairs, not
+    // sentence_bank ids — resolve them to ids here so selectStaticSentence can
+    // exclude by id without the client needing to know about static-mode IDs.
+    let recentIds: string[] = []
+    const recentZh = recent.map(r => r.zh).filter(Boolean)
+    if (recentZh.length > 0) {
+      const { data: recentRows } = await supabase
+        .from('sentence_bank')
+        .select('id')
+        .in('sentence_zh', recentZh)
+      recentIds = (recentRows ?? []).map((r: { id: string }) => r.id)
+    }
+
+    let staticSentence
+    try {
+      staticSentence = await selectStaticSentence(supabase, user.id, { recentIds })
+    } catch (err) {
+      console.error('selectStaticSentence error:', err)
+      return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    }
+
+    if (!staticSentence) {
+      return NextResponse.json({ error: 'not_enough_static_content' }, { status: 409 })
+    }
+
+    const response: GenerateResponse = {
+      sentence_id: staticSentence.id,
+      sentence_zh: staticSentence.sentence_zh,
+      sentence_py: staticSentence.sentence_py,
+      vocab_used: staticSentence.vocab_used,
+    }
+    return NextResponse.json(response)
+  }
+
+  // practiceMode === 'ai'
+  const apiKeyHeader = req.headers.get('X-Anthropic-Key')
+  if (!apiKeyHeader) {
+    return NextResponse.json({ error: 'Missing Anthropic API key' }, { status: 400 })
+  }
+  const anthropicClient = new Anthropic({ apiKey: apiKeyHeader })
 
   const { data: vocab } = await supabase
     .from('vocab_list')
@@ -70,7 +135,7 @@ Respond with ONLY valid JSON, no markdown:
 {"sentence_zh":"...","sentence_py":"...","vocab_used":["zh_word1","zh_word2"]}`
 
   try {
-    const claudeSentence = await callClaudeJson(prompt, 256, isClaudeSentence)
+    const claudeSentence = await callClaudeJson(prompt, 256, isClaudeSentence, anthropicClient)
 
     const { data: inserted, error: insertError } = await supabase
       .from('generated_sentences')

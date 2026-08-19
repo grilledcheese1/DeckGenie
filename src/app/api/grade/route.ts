@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { waitUntil } from '@vercel/functions'
+import Anthropic from '@anthropic-ai/sdk'
 import { requireUser } from '@/lib/api/auth'
 import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
 import { GradeRequest, GradeResponse } from '@/types'
+
+// Applies regardless of source table — sentence text is always server-issued,
+// never client-supplied, but a defensive cap keeps a bad/oversized row from
+// blowing up the grading prompt either way.
+const MAX_SENTENCE_LENGTH = 200
 
 function isGradeResponse(value: unknown): value is GradeResponse {
   if (!value || typeof value !== 'object') return false
@@ -25,6 +31,10 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { user, supabase } = auth
 
+  // Rate limiting and input-length caps apply before any mode branching, so
+  // they cover both modes identically — static-mode grading still spends the
+  // app's own Anthropic credits per call, so it needs the same protection
+  // 'ai' mode always had.
   const rateLimit = await checkRateLimit(user.id, 'grade')
   if (!rateLimit.success) {
     return NextResponse.json(
@@ -44,18 +54,72 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Input too large' }, { status: 400 })
   }
 
-  const { data: sentenceRow, error: sentenceError } = await supabase
-    .from('generated_sentences')
-    .select('sentence_zh, sentence_py, vocab_used')
-    .eq('id', sentence_id)
+  const { data: userSettings } = await supabase
+    .from('settings')
+    .select('practice_mode')
     .eq('user_id', user.id)
     .single()
+
+  const practiceMode = userSettings?.practice_mode ?? 'static'
+
+  let anthropicClient: Anthropic
+  if (practiceMode === 'ai') {
+    const apiKeyHeader = req.headers.get('X-Anthropic-Key')
+    if (!apiKeyHeader) {
+      return NextResponse.json({ error: 'Missing Anthropic API key' }, { status: 400 })
+    }
+    anthropicClient = new Anthropic({ apiKey: apiKeyHeader })
+  } else {
+    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+  }
+
+  // Sentence text is always loaded from a server-issued row, never trusted
+  // from the client body — which table depends on which mode produced it.
+  // practice_mode is re-read fresh above, but sentence_id reflects whatever
+  // mode was active when the sentence was generated — the two can disagree
+  // if the user switches modes (via the settings slide-in) between fetching
+  // a sentence and submitting an answer — so fall back to the other table
+  // before giving up.
+  type SentenceRow = { sentence_zh: string; sentence_py: string; vocab_used: string[] } | null
+
+  const lookupStatic = () =>
+    supabase
+      .from('sentence_bank')
+      .select('sentence_zh, sentence_py, vocab_used')
+      .eq('id', sentence_id)
+      .single()
+
+  const lookupAi = () =>
+    supabase
+      .from('generated_sentences')
+      .select('sentence_zh, sentence_py, vocab_used')
+      .eq('id', sentence_id)
+      .eq('user_id', user.id)
+      .single()
+
+  let sentenceRow: SentenceRow = null
+  let sentenceError: unknown = null
+
+  const primary = await (practiceMode === 'static' ? lookupStatic() : lookupAi())
+  sentenceRow = primary.data
+  sentenceError = primary.error
+
+  if (!sentenceRow) {
+    const fallback = await (practiceMode === 'static' ? lookupAi() : lookupStatic())
+    sentenceRow = fallback.data
+    sentenceError = fallback.error
+  }
 
   if (sentenceError || !sentenceRow) {
     return NextResponse.json({ error: 'Sentence not found' }, { status: 404 })
   }
 
   const { sentence_zh, sentence_py, vocab_used } = sentenceRow
+
+  if (sentence_zh.length > MAX_SENTENCE_LENGTH || sentence_py.length > MAX_SENTENCE_LENGTH) {
+    return NextResponse.json({ error: 'Sentence data invalid' }, { status: 500 })
+  }
+
   const truncatedAnswer = user_answer.slice(0, 500)
 
   const prompt = `You are grading a Chinese-to-English translation exercise.
@@ -75,7 +139,7 @@ Respond with ONLY valid JSON, no markdown:
 {"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"}`
 
   try {
-    const parsed = await callClaudeJson(prompt, 200, isGradeResponse)
+    const parsed = await callClaudeJson(prompt, 200, isGradeResponse, anthropicClient)
     parsed.correct = parsed.score >= 70
 
     // Tracking writes must never block or fail the grade response, but they also
