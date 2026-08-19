@@ -122,7 +122,36 @@ export async function POST(req: NextRequest) {
 
   const truncatedAnswer = user_answer.slice(0, 500)
 
-  const prompt = `You are grading a Chinese-to-English translation exercise.
+  // Cross-user cache: an identical (sentence, strictness, normalized answer)
+  // triple may already have been graded by someone else, especially likely
+  // in static mode where a shared, finite sentence_bank means the same wrong
+  // answers recur across users. A hit skips the Anthropic call entirely — a
+  // lookup failure just falls through to a normal miss, never aborts the
+  // request.
+  // Project has no generated Supabase Database types, so .rpc() results are
+  // untyped — narrow to the shape find_cached_grade actually returns.
+  const { data: cached, error: cacheError } = await supabase
+    .rpc('find_cached_grade', {
+      p_sentence_zh: sentence_zh,
+      p_sentence_py: sentence_py,
+      p_strictness: strictness,
+      p_user_answer: truncatedAnswer,
+    })
+    .maybeSingle() as { data: { score: number; correct_answer: string; feedback: string } | null; error: { message: string } | null }
+
+  if (cacheError) console.error('find_cached_grade error:', cacheError.message)
+
+  let parsed: GradeResponse
+
+  if (cached) {
+    parsed = {
+      correct: false, // recomputed below from score, never trusted from a cached row
+      score: cached.score,
+      feedback: cached.feedback,
+      correct_answer: cached.correct_answer,
+    }
+  } else {
+    const prompt = `You are grading a Chinese-to-English translation exercise.
 
 Chinese sentence: ${sentence_zh}
 Pinyin: ${sentence_py}
@@ -138,43 +167,46 @@ Grading mode: ${STRICTNESS[strictness] ?? STRICTNESS[2]}
 Respond with ONLY valid JSON, no markdown:
 {"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"}`
 
-  try {
-    const parsed = await callClaudeJson(prompt, 200, isGradeResponse, anthropicClient)
-    parsed.correct = parsed.score >= 70
-
-    // Tracking writes must never block or fail the grade response, but they also
-    // can't be truly fire-and-forget — Vercel freezes the function once the
-    // response is sent, which was silently dropping these. waitUntil keeps the
-    // invocation alive until they finish without making the client wait for them.
-    const recordAttempts = vocab_used?.length
-      ? Promise.all(vocab_used.map((zh: string) =>
-          supabase.rpc('record_word_attempt', {
-            p_word_zh: zh,
-            p_correct: parsed.correct,
-          })
-        )).catch(err => console.error('record_word_attempt error:', err))
-      : Promise.resolve()
-
-    const insertAttempt = supabase.from('sentence_attempts').insert({
-      user_id:         user.id,
-      sentence_zh,
-      sentence_py,
-      user_answer:     body.user_answer,
-      correct_answer:  parsed.correct_answer,
-      score:           parsed.score,
-      correct:         parsed.correct,
-      strictness_used: strictness,
-      vocab_used:      vocab_used ?? [],
-    }).then(({ error }) => {
-      if (error) console.error('sentence_attempts insert error:', error.message)
-    })
-
-    waitUntil(Promise.allSettled([recordAttempts, insertAttempt]))
-
-    return NextResponse.json(parsed)
-  } catch (err) {
-    console.error('Grade error:', err)
-    const status = err instanceof ClaudeResponseError ? 502 : 500
-    return NextResponse.json({ error: 'Grading failed' }, { status })
+    try {
+      parsed = await callClaudeJson(prompt, 200, isGradeResponse, anthropicClient)
+    } catch (err) {
+      console.error('Grade error:', err)
+      const status = err instanceof ClaudeResponseError ? 502 : 500
+      return NextResponse.json({ error: 'Grading failed' }, { status })
+    }
   }
+
+  parsed.correct = parsed.score >= 70
+
+  // Tracking writes must never block or fail the grade response, but they also
+  // can't be truly fire-and-forget — Vercel freezes the function once the
+  // response is sent, which was silently dropping these. waitUntil keeps the
+  // invocation alive until they finish without making the client wait for them.
+  const recordAttempts = vocab_used?.length
+    ? Promise.all(vocab_used.map((zh: string) =>
+        supabase.rpc('record_word_attempt', {
+          p_word_zh: zh,
+          p_correct: parsed.correct,
+        })
+      )).catch(err => console.error('record_word_attempt error:', err))
+    : Promise.resolve()
+
+  const insertAttempt = supabase.from('sentence_attempts').insert({
+    user_id:         user.id,
+    sentence_zh,
+    sentence_py,
+    user_answer:     body.user_answer,
+    correct_answer:  parsed.correct_answer,
+    score:           parsed.score,
+    correct:         parsed.correct,
+    feedback:        parsed.feedback,
+    strictness_used: strictness,
+    vocab_used:      vocab_used ?? [],
+  }).then(({ error }) => {
+    if (error) console.error('sentence_attempts insert error:', error.message)
+  })
+
+  waitUntil(Promise.allSettled([recordAttempts, insertAttempt]))
+
+  return NextResponse.json(parsed)
 }

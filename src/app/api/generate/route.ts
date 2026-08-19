@@ -29,7 +29,30 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { user, supabase } = auth
 
-  const rateLimit = await checkRateLimit(user.id, 'generate')
+  // Cheap gate before the settings lookup below, so a client hammering this
+  // route can't force an unbounded number of Supabase reads while we don't
+  // yet know its mode (and therefore which real budget applies).
+  const preflight = await checkRateLimit(user.id, 'generate_preflight')
+  if (!preflight.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(preflight.retryAfterSeconds) } }
+    )
+  }
+
+  // practice_mode is read before the real rate-limit check so the budget can
+  // be chosen per mode — 'ai' spends the user's own key (no budget
+  // protection needed, just a light anti-hammering cap) while 'static' only
+  // costs Supabase reads (same light cap, for a different reason).
+  const { data: userSettings } = await supabase
+    .from('settings')
+    .select('practice_mode')
+    .eq('user_id', user.id)
+    .single()
+
+  const practiceMode = userSettings?.practice_mode ?? 'static'
+
+  const rateLimit = await checkRateLimit(user.id, practiceMode === 'ai' ? 'generate_ai' : 'generate_static')
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: 'Too many requests' },
@@ -46,14 +69,6 @@ export async function POST(req: NextRequest) {
       zh: r.zh.slice(0, MAX_RECENT_FIELD_LENGTH),
       py: r.py.slice(0, MAX_RECENT_FIELD_LENGTH),
     }))
-
-  const { data: userSettings } = await supabase
-    .from('settings')
-    .select('practice_mode')
-    .eq('user_id', user.id)
-    .single()
-
-  const practiceMode = userSettings?.practice_mode ?? 'static'
 
   if (practiceMode === 'static') {
     // The client's variety-tracking sends recently-served {zh, py} pairs, not
