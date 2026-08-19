@@ -105,7 +105,7 @@ function SignupContent() {
       {/* Neon signs — main signup form. Adjust style={{ }} per sign to reposition. */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.13, zIndex: 0 }} aria-hidden="true">
         {/*Left Side*/}
-        <NeonSign english="DECKGENIE"  chinese="甲板精灵" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-40%', top: '6%' }} />
+        <NeonSign english="INKITSU"  chinese="音吉" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-40%', top: '6%' }} />
         <NeonSign english="PERSIST"  chinese="坚持" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={3} delay={1.4} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '-27%', top: '-41%' }} />
         <NeonSignH english="PROGRESS" chinese="进步" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={2.5} delay={2.8} mode={signMode} fadeInDuration={1.5} className="absolute" style={{ left: '4%', bottom: '39%' }} />
 
