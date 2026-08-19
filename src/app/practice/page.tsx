@@ -15,7 +15,7 @@ import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
 import { SessionSummary } from '@/components/practice/SessionSummary'
 import { ReviewScreen }   from '@/components/practice/ReviewScreen'
 import { StreakFlame }    from '@/components/practice/StreakFlame'
-import type { CorpusWord, VocabWord, WrongAnswer, RoundSummary, SessionDraft } from '@/types'
+import type { CorpusWord, VocabWord, WrongAnswer, RoundSummary, SessionDraft, Settings } from '@/types'
 
 const DRAFT_KEY = 'hanzi_session_draft'
 const DRAFT_TTL = 24 * 60 * 60 * 1000
@@ -75,6 +75,7 @@ function PracticeInner() {
   const userIdRef        = useRef<string | null>(null)
   const clearedDraftRef  = useRef(false)
   const initedRef        = useRef(false)
+  const lastModeRef      = useRef<Settings['practice_mode'] | null>(null)
 
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsBeforeUnlock = settings?.rounds_before_unlock ?? 3
@@ -92,6 +93,7 @@ function PracticeInner() {
     // on every reload().
     if (!settings || initedRef.current) return
     initedRef.current = true
+    lastModeRef.current = settings.practice_mode
 
     async function init() {
       const supabase = createClient()
@@ -128,6 +130,22 @@ function PracticeInner() {
     }
     init()
   }, [settings]) // eslint-disable-line
+
+  // The initedRef latch above only ever runs its body once, so a settings
+  // reload after the initial load (e.g. switching to AI mode and saving a
+  // key via the "Open settings" button on the no-content screen) would
+  // otherwise leave the page stuck showing the stale no_content/error state
+  // forever, with no automatic or manual way to retry. Re-fetch once when
+  // practice_mode actually changes post-init and we're in one of those
+  // stuck states.
+  useEffect(() => {
+    if (!initedRef.current || !settings) return
+    if (lastModeRef.current === settings.practice_mode) return
+    lastModeRef.current = settings.practice_mode
+    if (state.status === 'no_content' || state.status === 'error') {
+      fetchSentence()
+    }
+  }, [settings?.practice_mode]) // eslint-disable-line
 
   useEffect(() => {
     if (state.status === 'graded' && state.grade) {
