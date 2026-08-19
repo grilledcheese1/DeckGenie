@@ -35,6 +35,9 @@ export function usePractice(strictness: number = 2, practiceMode: Settings['prac
       })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
+        if (body?.error === 'not_enough_static_content') {
+          throw new Error('Not enough matching sentences yet — unlock more vocabulary to keep practicing.')
+        }
         throw new Error(body?.error || 'Failed to generate a sentence.')
       }
       const data: GenerateResponse = await res.json()

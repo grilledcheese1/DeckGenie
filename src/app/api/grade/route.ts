@@ -75,27 +75,39 @@ export async function POST(req: NextRequest) {
 
   // Sentence text is always loaded from a server-issued row, never trusted
   // from the client body — which table depends on which mode produced it.
+  // practice_mode is re-read fresh above, but sentence_id reflects whatever
+  // mode was active when the sentence was generated — the two can disagree
+  // if the user switches modes (via the settings slide-in) between fetching
+  // a sentence and submitting an answer — so fall back to the other table
+  // before giving up.
   type SentenceRow = { sentence_zh: string; sentence_py: string; vocab_used: string[] } | null
-  let sentenceRow: SentenceRow = null
-  let sentenceError: unknown = null
 
-  if (practiceMode === 'static') {
-    const res = await supabase
+  const lookupStatic = () =>
+    supabase
       .from('sentence_bank')
       .select('sentence_zh, sentence_py, vocab_used')
       .eq('id', sentence_id)
       .single()
-    sentenceRow = res.data
-    sentenceError = res.error
-  } else {
-    const res = await supabase
+
+  const lookupAi = () =>
+    supabase
       .from('generated_sentences')
       .select('sentence_zh, sentence_py, vocab_used')
       .eq('id', sentence_id)
       .eq('user_id', user.id)
       .single()
-    sentenceRow = res.data
-    sentenceError = res.error
+
+  let sentenceRow: SentenceRow = null
+  let sentenceError: unknown = null
+
+  const primary = await (practiceMode === 'static' ? lookupStatic() : lookupAi())
+  sentenceRow = primary.data
+  sentenceError = primary.error
+
+  if (!sentenceRow) {
+    const fallback = await (practiceMode === 'static' ? lookupAi() : lookupStatic())
+    sentenceRow = fallback.data
+    sentenceError = fallback.error
   }
 
   if (sentenceError || !sentenceRow) {

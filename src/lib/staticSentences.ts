@@ -3,6 +3,8 @@ import type { CorpusSentence } from '@/types'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
+export type StaticSentenceRow = Pick<CorpusSentence, 'id' | 'sentence_zh' | 'sentence_py' | 'vocab_used'>
+
 interface SelectStaticSentenceOpts {
   recentIds: string[]
 }
@@ -11,16 +13,28 @@ interface SelectStaticSentenceOpts {
 // mode doesn't always serve the single "weakest word" sentence on repeat.
 const TOP_POOL_SIZE = 5
 
+// Matches this project's Supabase `max_rows` cap (supabase/config.toml) — a
+// single response is silently truncated at this many rows, so the candidate
+// query must paginate or it will quietly lose rows once the corpus (already
+// 726 rows, ~1050 once fully seeded) exceeds this for a given hsk_level.
+const PAGE_SIZE = 1000
+
 export async function selectStaticSentence(
   supabase: SupabaseServerClient,
   userId: string,
   opts: SelectStaticSentenceOpts
-): Promise<CorpusSentence | null> {
-  const [{ data: settings }, { data: vocab }] = await Promise.all([
+): Promise<StaticSentenceRow | null> {
+  const [{ data: settings }, { data: vocab, error: vocabError }] = await Promise.all([
+    // Settings errors/missing rows fall back to the default HSK level below —
+    // that's an intentional degraded-but-working path, not a failure to propagate.
     supabase.from('settings').select('starting_hsk').eq('user_id', userId).single(),
     supabase.from('vocab_list').select('word_zh, times_seen, times_correct').eq('user_id', userId),
   ])
 
+  // A query failure must not be reported as "not enough content" — that tells
+  // the caller to fall back to a legitimate empty state when the real problem
+  // is the DB call itself.
+  if (vocabError) throw new Error(`vocab_list query failed: ${vocabError.message}`)
   if (!vocab || vocab.length === 0) return null
 
   const maxHsk = settings?.starting_hsk ?? 2
@@ -31,16 +45,24 @@ export async function selectStaticSentence(
     )
   )
 
-  const { data: candidates } = await supabase
-    .from('sentence_bank')
-    .select('*')
-    .lte('hsk_level', maxHsk)
+  const candidates: StaticSentenceRow[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data: page, error: pageError } = await supabase
+      .from('sentence_bank')
+      .select('id, sentence_zh, sentence_py, vocab_used')
+      .lte('hsk_level', maxHsk)
+      .range(from, from + PAGE_SIZE - 1)
+    if (pageError) throw new Error(`sentence_bank query failed: ${pageError.message}`)
+    if (!page || page.length === 0) break
+    candidates.push(...(page as StaticSentenceRow[]))
+    if (page.length < PAGE_SIZE) break
+  }
 
-  if (!candidates || candidates.length === 0) return null
+  if (candidates.length === 0) return null
 
   const recentSet = new Set(opts.recentIds)
 
-  const eligible = (candidates as CorpusSentence[]).filter(row => {
+  const eligible = candidates.filter(row => {
     if (recentSet.has(row.id)) return false
     // A sentence can't be served if it uses a word the user hasn't unlocked.
     return row.vocab_used.every(zh => ownedWords.has(zh))

@@ -17,6 +17,13 @@ function isClaudeSentence(value: unknown): value is ClaudeSentence {
     && v.vocab_used.every(w => typeof w === 'string')
 }
 
+// recent entries are echoed back by the client from prior responses — the
+// declared request body type is a compile-time assertion only, not runtime
+// validation of req.json()'s actual (any-typed) result. Every entry ends up
+// either in a Supabase filter or interpolated into the LLM prompt, so
+// malformed/oversized values must be dropped and bounded here.
+const MAX_RECENT_FIELD_LENGTH = 200
+
 export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (auth instanceof NextResponse) return auth
@@ -32,7 +39,13 @@ export async function POST(req: NextRequest) {
 
   let body: { recent?: Array<{ zh: string; py: string }> } = {}
   try { body = await req.json() } catch { /* no body */ }
-  const recent = Array.isArray(body?.recent) ? body.recent.slice(0, 5) : []
+  const rawRecent = Array.isArray(body?.recent) ? body.recent.slice(0, 5) : []
+  const recent = rawRecent
+    .filter((r): r is { zh: string; py: string } => typeof r?.zh === 'string' && typeof r?.py === 'string')
+    .map(r => ({
+      zh: r.zh.slice(0, MAX_RECENT_FIELD_LENGTH),
+      py: r.py.slice(0, MAX_RECENT_FIELD_LENGTH),
+    }))
 
   const { data: userSettings } = await supabase
     .from('settings')
@@ -56,10 +69,16 @@ export async function POST(req: NextRequest) {
       recentIds = (recentRows ?? []).map((r: { id: string }) => r.id)
     }
 
-    const staticSentence = await selectStaticSentence(supabase, user.id, { recentIds })
+    let staticSentence
+    try {
+      staticSentence = await selectStaticSentence(supabase, user.id, { recentIds })
+    } catch (err) {
+      console.error('selectStaticSentence error:', err)
+      return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    }
 
     if (!staticSentence) {
-      return NextResponse.json({ error: 'not_enough_static_content' }, { status: 200 })
+      return NextResponse.json({ error: 'not_enough_static_content' }, { status: 409 })
     }
 
     const response: GenerateResponse = {
