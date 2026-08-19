@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
   const { data: cached, error: cacheError } = await supabase
     .rpc('find_cached_grade', {
       p_sentence_zh: sentence_zh,
+      p_sentence_py: sentence_py,
       p_strictness: strictness,
       p_user_answer: truncatedAnswer,
     })
