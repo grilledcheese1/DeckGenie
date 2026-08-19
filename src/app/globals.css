@@ -30,6 +30,10 @@ textarea:focus {
 
 /* ── Theme system ─────────────────────────────────── */
 
+:root {
+  --enso-ring-color: rgba(255,255,255,0.45);
+}
+
 /* Default: Ink & Jade (also used when no theme set) */
 :root,
 [data-theme="ink-jade"] {
@@ -60,6 +64,10 @@ textarea:focus {
   --hsk-6-color: #fb923c; --hsk-6-bg: rgba(67,20,7,0.5);   --hsk-6-border: #7c2d12;
   --char-highlight: rgba(255,255,255,0.07);
   --char-hover-bg:  rgba(255,255,255,0.05);
+  --gradient-cta-from: #059669;
+  --gradient-cta-to: #2dd4bf;
+  --sidebar-active-bg: var(--accent);
+  --sidebar-active-text: white;
 }
 
 [data-theme="vermillion-cream"] {
@@ -90,6 +98,10 @@ textarea:focus {
   --hsk-6-color: #c2410c; --hsk-6-bg: rgba(194,65,12,0.12);  --hsk-6-border: rgba(194,65,12,0.35);
   --char-highlight: rgba(0,0,0,0.08);
   --char-hover-bg:  rgba(0,0,0,0.05);
+  --gradient-cta-from: #c0392b;
+  --gradient-cta-to: #e08e6f;
+  --sidebar-active-bg: var(--accent);
+  --sidebar-active-text: white;
 }
 
 [data-theme="bamboo-light"] {
@@ -120,6 +132,10 @@ textarea:focus {
   --hsk-6-color: #c2410c; --hsk-6-bg: rgba(194,65,12,0.1);   --hsk-6-border: rgba(194,65,12,0.3);
   --char-highlight: rgba(0,0,0,0.08);
   --char-hover-bg:  rgba(0,0,0,0.05);
+  --gradient-cta-from: #4d7c5f;
+  --gradient-cta-to: #7fae8f;
+  --sidebar-active-bg: var(--accent);
+  --sidebar-active-text: white;
 }
 
 [data-theme] body,

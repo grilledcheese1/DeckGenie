@@ -68,9 +68,9 @@ function SignupContent() {
       >
         {/* Neon signs — confirmation screen. Adjust style={{ }} per sign to reposition. */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }} aria-hidden="true">
-          <NeonSign english="STUDY"    chinese="学习" color="#00fff5" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1} delay={0}   mode={signMode} className="absolute" style={{ left: '4%',  top: '8%' }} />
-          <NeonSign english="PERSIST"  chinese="坚持" color="#ff2d78" glowColor={signMode === 'neon' ? "rgba(255,45,120,0.35)" : undefined} size={1} delay={1.4} mode={signMode} className="absolute" style={{ right: '4%', top: '15%' }} />
-          <NeonSign english="PROGRESS" chinese="进步" color="#ffb800" glowColor={signMode === 'neon' ? "rgba(255,184,0,0.35)" : undefined}  size={1} delay={2.8} mode={signMode} className="absolute" style={{ left: '6%',  bottom: '12%' }} />
+          <NeonSign english="STUDY"    chinese="学习" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1} delay={0}   mode={signMode} className="absolute" style={{ left: '4%',  top: '8%' }} />
+          <NeonSign english="PERSIST"  chinese="坚持" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1} delay={1.4} mode={signMode} className="absolute" style={{ right: '4%', top: '15%' }} />
+          <NeonSign english="PROGRESS" chinese="进步" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={1} delay={2.8} mode={signMode} className="absolute" style={{ left: '6%',  bottom: '12%' }} />
         </div>
         <div className="w-full max-w-sm text-center relative" style={{ zIndex: 1 }}>
           <p className="font-hanzi text-5xl mb-6" style={{ color: 'var(--hanzi-color)' }}>音吉</p>
