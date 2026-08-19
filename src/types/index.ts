@@ -42,6 +42,23 @@ export interface Progress {
   updated_at: string
 }
 
+export interface SentenceAttempt {
+  id: string
+  user_id: string
+  round_summary_id: string | null
+  sentence_zh: string
+  sentence_py: string
+  user_answer: string
+  user_answer_normalized: string
+  correct_answer: string
+  feedback: string | null
+  score: number
+  correct: boolean
+  strictness_used: 1 | 2 | 3
+  vocab_used: string[]
+  attempted_at: string
+}
+
 export interface CorpusWord {
   zh: string
   py: string
