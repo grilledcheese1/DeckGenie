@@ -4,6 +4,11 @@ import { useState, useCallback, useRef } from 'react'
 import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode, Settings } from '@/types'
 import { getApiKey } from '@/lib/byoKey'
 
+// Dev-only shortcut: typing this as the answer jumps straight to a graded
+// state without calling /api/grade, so the post-grade UI (Next sentence,
+// Analyze sentence) can be reviewed without spending any API credits.
+const DEV_SKIP_CODE = '8302113'
+
 export function usePractice(strictness: number = 2, practiceMode: Settings['practice_mode'] = 'static') {
   const [state, setState] = useState<SentenceState>({
     sentence: null,
@@ -55,6 +60,21 @@ export function usePractice(strictness: number = 2, practiceMode: Settings['prac
 
   const submitAnswer = useCallback(async () => {
     if (!state.sentence || !state.userAnswer.trim()) return
+
+    if (process.env.NODE_ENV !== 'production' && state.userAnswer.trim() === DEV_SKIP_CODE) {
+      setState(prev => ({
+        ...prev,
+        status: 'graded',
+        grade: {
+          correct: true,
+          score: 100,
+          feedback: 'Dev shortcut — no grading call was made.',
+          correct_answer: '(dev preview — no real translation graded)',
+        },
+      }))
+      return
+    }
+
     let apiKey: string | null = null
     if (practiceMode === 'ai') {
       apiKey = getApiKey()
