@@ -29,10 +29,21 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { user, supabase } = auth
 
-  // practice_mode is read before rate limiting so the budget can be chosen
-  // per mode — 'ai' spends the user's own key (no budget protection needed,
-  // just a light anti-hammering cap) while 'static' only costs Supabase
-  // reads (same light cap, for a different reason).
+  // Cheap gate before the settings lookup below, so a client hammering this
+  // route can't force an unbounded number of Supabase reads while we don't
+  // yet know its mode (and therefore which real budget applies).
+  const preflight = await checkRateLimit(user.id, 'generate_preflight')
+  if (!preflight.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(preflight.retryAfterSeconds) } }
+    )
+  }
+
+  // practice_mode is read before the real rate-limit check so the budget can
+  // be chosen per mode — 'ai' spends the user's own key (no budget
+  // protection needed, just a light anti-hammering cap) while 'static' only
+  // costs Supabase reads (same light cap, for a different reason).
   const { data: userSettings } = await supabase
     .from('settings')
     .select('practice_mode')

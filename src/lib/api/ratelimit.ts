@@ -2,6 +2,11 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 const BUDGETS = {
+  // Cheap first-pass gate for /api/generate, checked before the settings
+  // lookup that determines mode — protects that Supabase read itself from
+  // being hammered by a client the real per-mode budgets below haven't even
+  // classified yet. Not a replacement for them, just a pre-filter.
+  generate_preflight: { limit: 30, window: '1 m' },
   // 'ai' mode spends the user's own Anthropic key, so this cap isn't a cost
   // control — it just stops the route itself from being hammered.
   generate_ai: { limit: 30, window: '1 m' },
