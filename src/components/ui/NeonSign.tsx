@@ -1,6 +1,5 @@
 'use client'
 
-import { useRef } from 'react'
 import { useTypewriterCycle } from '@/hooks/useTypewriterCycle'
 
 export type SignMode = 'neon' | 'vermillion' | 'bamboo'
@@ -22,8 +21,6 @@ export function NeonSign({
   english, chinese, color,
   delay = 0, size = 1, mode = 'neon', fadeInDuration = 1.5, glowColor = '', className = '', style = {},
 }: NeonSignProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
   const isNeon = mode === 'neon'
   const effectiveGlowColor = glowColor || color
 
@@ -76,7 +73,6 @@ export function NeonSign({
 
   return (
     <div
-      ref={containerRef}
       className={`relative flex flex-col items-center ${className}`}
       style={style}
     >

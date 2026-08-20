@@ -3,7 +3,7 @@
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
 import { NeonSignH } from '@/components/ui/NeonSignH'
-import { NEON_SIGN_COLOR } from '@/lib/neonSignPresets'
+import { NEON_SIGN_COLOR, neonGlowFor } from '@/lib/neonSignPresets'
 
 export type AuthLayoutVariant = 'primary' | 'confirmation'
 
@@ -17,12 +17,8 @@ interface AuthLayoutProps {
   variant?: AuthLayoutVariant
 }
 
-function glowFor(signMode: SignMode) {
-  return signMode === 'neon' ? 'rgba(0,255,245,0.35)' : undefined
-}
-
 function PrimarySigns({ signMode }: { signMode: SignMode }) {
-  const glowColor = glowFor(signMode)
+  const glowColor = neonGlowFor(signMode)
   return (
     <>
       {/* Left Side */}
@@ -39,7 +35,7 @@ function PrimarySigns({ signMode }: { signMode: SignMode }) {
 }
 
 function ConfirmationSigns({ signMode }: { signMode: SignMode }) {
-  const glowColor = glowFor(signMode)
+  const glowColor = neonGlowFor(signMode)
   return (
     <>
       <NeonSign english="STUDY"    chinese="学习" color={NEON_SIGN_COLOR} glowColor={glowColor} size={1} delay={0}   mode={signMode} className="absolute" style={{ left: '4%',  top: '8%' }} />

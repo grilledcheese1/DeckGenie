@@ -131,7 +131,7 @@ export function useTypewriterCycle({
       clearTimeout(warmup)
       clearAll()
     }
-  }, [delay, runCycle]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [delay, runCycle])
 
   useEffect(() => {
     if (!borderRef.current) return
