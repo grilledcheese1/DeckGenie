@@ -12,6 +12,9 @@ import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
 import { AppShell } from '@/components/shell/AppShell'
 import { PracticeRightRail } from '@/components/practice/PracticeRightRail'
 import { AnalysisRightRail } from '@/components/practice/AnalysisRightRail'
+import { SentenceBreakdownCard } from '@/components/practice/SentenceBreakdownCard'
+import { GrammarFocusCard } from '@/components/practice/GrammarFocusCard'
+import { TipsCard } from '@/components/practice/TipsCard'
 import { ScoreRing } from '@/components/practice/ScoreRing'
 import { Badge, getWordStatus } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
@@ -431,6 +434,20 @@ function PracticeInner() {
             </div>
           </div>
 
+          {/* Grammar-analysis cards — same cards AnalysisRightRail renders in
+              the actual right rail at xl+. RightRail (src/components/shell/
+              RightRail.tsx) is `hidden xl:flex`, so below xl this content
+              would otherwise be completely unreachable — this app is
+              mobile-first, and these cards are the whole point of the
+              /api/grade grammar-analysis extension. Duplicating the render
+              here (rather than a single responsive component) mirrors
+              RightRail's own hidden/flex split, just inverted. */}
+          <div className="xl:hidden space-y-4 mb-4">
+            <SentenceBreakdownCard segments={state.grade?.sentenceStructure} />
+            <GrammarFocusCard grammarFocus={state.grade?.grammarFocus} />
+            <TipsCard sentence={state.sentence} vocabList={vocabList} grammarFocus={state.grade?.grammarFocus} />
+          </div>
+
           {/* Next sentence */}
           <button
             onClick={() => { exitAnalysis(); handleNext() }}
@@ -448,229 +465,229 @@ function PracticeInner() {
   // ── Normal practice mode ───────────────────────────────────────────
   return (
     <AppShell rightRail={<PracticeRightRail />}>
-    <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto">
+      <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto">
 
-      {/* Top nav */}
-      <div className="flex items-center justify-between mb-8">
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="text-sm flex items-center gap-1.5 transition-colors"
-          style={{ color: 'var(--text-tertiary)' }}
-        >
-          ← Dashboard
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {vocabCount} words
-          </span>
-
-          <span
-            className="text-xs px-2 py-0.5 rounded-full"
-            style={{
-              color: settings?.practice_mode === 'ai' ? 'var(--accent-text)' : 'var(--text-tertiary)',
-              backgroundColor: settings?.practice_mode === 'ai' ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
-              border: '0.5px solid var(--border)',
-            }}
-          >
-            {settings?.practice_mode === 'ai' ? 'AI mode' : 'Free mode'}
-          </span>
-
-          <StreakFlame streak={currentStreak} />
-
-          <Link
-            href="/settings"
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover-border"
-            style={{
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-tertiary)',
-            }}
-            aria-label="Settings"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-          </Link>
-
+        {/* Top nav */}
+        <div className="flex items-center justify-between mb-8">
           <button
-            onClick={cycleTheme}
-            aria-label="Switch theme"
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:opacity-80"
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '0.5px solid var(--border)',
-              color: 'var(--text-tertiary)',
-              fontSize: '14px',
-            }}
+            onClick={() => router.push('/dashboard')}
+            className="text-sm flex items-center gap-1.5 transition-colors"
+            style={{ color: 'var(--text-tertiary)' }}
           >
-            ◐
+            ← Dashboard
           </button>
-        </div>
-      </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {vocabCount} words
+            </span>
 
-      {/* Sentence area */}
-      <div ref={cardWrapRef} className="flex-1">
-        {state.status === 'loading' && (
-          <div className="animate-pulse">
-            <div
-              className="rounded-3xl p-6 mb-4"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            <span
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{
+                color: settings?.practice_mode === 'ai' ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                backgroundColor: settings?.practice_mode === 'ai' ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+                border: '0.5px solid var(--border)',
+              }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="h-3 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-                <div className="h-3 w-10 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-              </div>
-              <div className="flex flex-col items-center gap-3 py-6">
-                <div className="h-10 w-40 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-                <div className="h-4 w-24 rounded-full opacity-60" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-              </div>
-            </div>
-            <div
-              className="rounded-3xl p-5"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-            >
-              <div className="h-3 w-32 rounded-full mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-              <div className="h-12 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-            </div>
-          </div>
-        )}
+              {settings?.practice_mode === 'ai' ? 'AI mode' : 'Free mode'}
+            </span>
 
-        {state.status === 'error' && (
-          <div
-            className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {state.error || 'Something went wrong generating your sentence.'}
-            </p>
-            <button
-              onClick={() => fetchSentence()}
-              className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
-              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-            >
-              Try again
-            </button>
-          </div>
-        )}
+            <StreakFlame streak={currentStreak} />
 
-        {state.status === 'no_content' && (
-          <div
-            className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              We&apos;re out of practice sentences for your current words — try unlocking more, or switch to AI mode in Settings.
-            </p>
-            <div className="flex gap-2">
-              {canUnlock && (
-                <button
-                  onClick={() => setShowUnlock(true)}
-                  className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
-                  style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-                >
-                  Unlock more words
-                </button>
-              )}
-              <Link
-                href="/settings"
-                className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-bg hover-border inline-flex items-center justify-center"
-                style={{
-                  backgroundColor: canUnlock ? 'transparent' : 'var(--accent)',
-                  border: canUnlock ? '1px solid var(--border)' : 'none',
-                  color: canUnlock ? 'var(--text-secondary)' : 'white',
-                }}
-              >
-                Open settings
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {state.sentence && state.status !== 'loading' && state.status !== 'error' && state.status !== 'no_content' && (
-          <SentenceCard
-            sentence={state.sentence}
-            pinyinMode={state.pinyinMode}
-            showPinyinSetting={settings?.show_pinyin ?? 'tap'}
-            onTogglePinyin={togglePinyin}
-            userAnswer={state.userAnswer}
-            onAnswerChange={setAnswer}
-            onSubmit={submitAnswer}
-            grade={state.grade}
-            status={state.status}
-            showHints={settings?.show_hints ?? 'after'}
-            sentenceNumber={sentenceNum}
-            totalSentences={sentencesPerRound}
-            difficulty={getDifficulty(state.sentence.vocab_used)}
-          />
-        )}
-      </div>
-
-      {/* Next sentence / Done button */}
-      {state.status === 'graded' && (
-        <div className="mt-6 slide-up">
-          {sentenceNum === sentencesPerRound ? (
-            <button
-              onClick={handleNext}
-              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
-              style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
-            >
-              Done! →
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
+            <Link
+              href="/settings"
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover-border"
               style={{
                 backgroundColor: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Next sentence →
-            </button>
-          )}
-
-          <div className="mt-3">
-            <button
-              onClick={enterAnalysis}
-              className="w-full rounded-2xl py-3 text-sm transition-all active:scale-[0.98] hover-bg hover-border"
-              style={{
-                background: 'transparent',
-                border: '0.5px solid var(--border)',
                 color: 'var(--text-tertiary)',
               }}
+              aria-label="Settings"
             >
-              Analyze sentence
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </Link>
+
+            <button
+              onClick={cycleTheme}
+              aria-label="Switch theme"
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:opacity-80"
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '0.5px solid var(--border)',
+                color: 'var(--text-tertiary)',
+                fontSize: '14px',
+              }}
+            >
+              ◐
             </button>
           </div>
         </div>
-      )}
 
-      {showUnlock && (
-        <UnlockModal
-          wordsPerUnlock={wordsPerUnlock}
-          currentHsk={currentHsk}
-          activeVocab={activeVocabZh}
-          onComplete={handleUnlockComplete}
-          completeCta={startUnlock ? 'Back to Dashboard →' : 'Keep practicing →'}
-        />
-      )}
+        {/* Sentence area */}
+        <div ref={cardWrapRef} className="flex-1">
+          {state.status === 'loading' && (
+            <div className="animate-pulse">
+              <div
+                className="rounded-3xl p-6 mb-4"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="h-3 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                  <div className="h-3 w-10 rounded-full" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                </div>
+                <div className="flex flex-col items-center gap-3 py-6">
+                  <div className="h-10 w-40 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                  <div className="h-4 w-24 rounded-full opacity-60" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                </div>
+              </div>
+              <div
+                className="rounded-3xl p-5"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
+                <div className="h-3 w-32 rounded-full mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                <div className="h-12 rounded-xl" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+              </div>
+            </div>
+          )}
 
-      {showSummary && roundSummary && (
-        <SessionSummary
-          summary={roundSummary}
-          onReview={() => { setShowSummary(false); setShowReview(true) }}
-          onDashboard={goToDashboard}
-        />
-      )}
+          {state.status === 'error' && (
+            <div
+              className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {state.error || 'Something went wrong generating your sentence.'}
+              </p>
+              <button
+                onClick={() => fetchSentence()}
+                className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
+                style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
 
-      {showReview && roundSummary && (
-        <ReviewScreen
-          wrongAnswers={roundSummary.wrongAnswers}
-          onDone={goToDashboard}
-        />
-      )}
-    </div>
+          {state.status === 'no_content' && (
+            <div
+              className="rounded-3xl p-6 flex flex-col items-center text-center gap-3"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            >
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                We&apos;re out of practice sentences for your current words — try unlocking more, or switch to AI mode in Settings.
+              </p>
+              <div className="flex gap-2">
+                {canUnlock && (
+                  <button
+                    onClick={() => setShowUnlock(true)}
+                    className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-accent"
+                    style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                  >
+                    Unlock more words
+                  </button>
+                )}
+                <Link
+                  href="/settings"
+                  className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-bg hover-border inline-flex items-center justify-center"
+                  style={{
+                    backgroundColor: canUnlock ? 'transparent' : 'var(--accent)',
+                    border: canUnlock ? '1px solid var(--border)' : 'none',
+                    color: canUnlock ? 'var(--text-secondary)' : 'white',
+                  }}
+                >
+                  Open settings
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {state.sentence && state.status !== 'loading' && state.status !== 'error' && state.status !== 'no_content' && (
+            <SentenceCard
+              sentence={state.sentence}
+              pinyinMode={state.pinyinMode}
+              showPinyinSetting={settings?.show_pinyin ?? 'tap'}
+              onTogglePinyin={togglePinyin}
+              userAnswer={state.userAnswer}
+              onAnswerChange={setAnswer}
+              onSubmit={submitAnswer}
+              grade={state.grade}
+              status={state.status}
+              showHints={settings?.show_hints ?? 'after'}
+              sentenceNumber={sentenceNum}
+              totalSentences={sentencesPerRound}
+              difficulty={getDifficulty(state.sentence.vocab_used)}
+            />
+          )}
+        </div>
+
+        {/* Next sentence / Done button */}
+        {state.status === 'graded' && (
+          <div className="mt-6 slide-up">
+            {sentenceNum === sentencesPerRound ? (
+              <button
+                onClick={handleNext}
+                className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-accent"
+                style={{ backgroundColor: 'var(--accent)', border: '1px solid var(--accent)', color: 'white' }}
+              >
+                Done! →
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                className="w-full active:scale-[0.98] font-medium rounded-2xl py-4 text-sm transition-all hover-bg"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Next sentence →
+              </button>
+            )}
+
+            <div className="mt-3">
+              <button
+                onClick={enterAnalysis}
+                className="w-full rounded-2xl py-3 text-sm transition-all active:scale-[0.98] hover-bg hover-border"
+                style={{
+                  background: 'transparent',
+                  border: '0.5px solid var(--border)',
+                  color: 'var(--text-tertiary)',
+                }}
+              >
+                Analyze sentence
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showUnlock && (
+          <UnlockModal
+            wordsPerUnlock={wordsPerUnlock}
+            currentHsk={currentHsk}
+            activeVocab={activeVocabZh}
+            onComplete={handleUnlockComplete}
+            completeCta={startUnlock ? 'Back to Dashboard →' : 'Keep practicing →'}
+          />
+        )}
+
+        {showSummary && roundSummary && (
+          <SessionSummary
+            summary={roundSummary}
+            onReview={() => { setShowSummary(false); setShowReview(true) }}
+            onDashboard={goToDashboard}
+          />
+        )}
+
+        {showReview && roundSummary && (
+          <ReviewScreen
+            wrongAnswers={roundSummary.wrongAnswers}
+            onDone={goToDashboard}
+          />
+        )}
+      </div>
     </AppShell>
   )
 }

@@ -62,6 +62,7 @@ function SpeakerButton({ text }: { text: string }) {
       const audio = new Audio(url)
       audio.playbackRate = rate
       audio.onended = () => setSpeechState('idle')
+      audio.onerror = () => setSpeechState('idle')
       await audio.play()
     } catch {
       setSpeechState('idle')
