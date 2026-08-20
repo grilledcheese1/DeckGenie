@@ -3,12 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import type { GenerateResponse, GradeResponse } from '@/types'
+import { Button } from '@/components/ui/Button'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
+type SpeechState = 'idle' | 'normal' | 'slow'
+
+/**
+ * `speak()` is the single fetch-and-play implementation, parameterized by
+ * `playbackRate` — both the normal-speed and slow-speed buttons call it
+ * with a different rate rather than duplicating the fetch/blob/Audio setup.
+ * Each click does fetch its own audio blob (there's no cross-click caching),
+ * but a single click's slow playback never issues more than the one
+ * `/api/speak` request that click already needs.
+ */
 function SpeakerButton({ text }: { text: string }) {
-  const [speaking, setSpeaking] = useState(false)
+  const [speechState, setSpeechState] = useState<SpeechState>('idle')
 
-  async function speak() {
-    setSpeaking(true)
+  async function speak(rate: number, which: SpeechState) {
+    setSpeechState(which)
     try {
       const res = await fetch('/api/speak', {
         method: 'POST',
@@ -19,43 +31,65 @@ function SpeakerButton({ text }: { text: string }) {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
+      audio.playbackRate = rate
       audio.onended = () => {
-        setSpeaking(false)
+        setSpeechState('idle')
         URL.revokeObjectURL(url)
       }
-      audio.play()
+      await audio.play()
     } catch {
-      setSpeaking(false)
+      setSpeechState('idle')
     }
   }
 
+  const busy = speechState !== 'idle'
+
   return (
-    <button
-      onClick={speak}
-      disabled={speaking}
-      aria-label="Listen to pronunciation"
-      className="flex-shrink-0 mt-2 w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
-      style={{
-        background: speaking ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
-        border: `0.5px solid ${speaking ? 'var(--accent)' : 'var(--border)'}`,
-        color: speaking ? 'var(--accent-text)' : 'var(--text-tertiary)',
-      }}
-    >
-      {speaking ? (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-        </svg>
-      )}
-    </button>
+    <div className="flex-shrink-0 mt-2 flex items-center gap-1.5">
+      <button
+        onClick={() => speak(1, 'normal')}
+        disabled={busy}
+        aria-label="Listen to pronunciation"
+        className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
+        style={{
+          background: speechState === 'normal' ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+          border: `0.5px solid ${speechState === 'normal' ? 'var(--accent)' : 'var(--border)'}`,
+          color: speechState === 'normal' ? 'var(--accent-text)' : 'var(--text-tertiary)',
+        }}
+      >
+        {speechState === 'normal' ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+        )}
+      </button>
+
+      <button
+        onClick={() => speak(0.6, 'slow')}
+        disabled={busy}
+        aria-label="Listen slowly"
+        title="Slow playback"
+        className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
+        style={{
+          background: speechState === 'slow' ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+          border: `0.5px solid ${speechState === 'slow' ? 'var(--accent)' : 'var(--border)'}`,
+          color: speechState === 'slow' ? 'var(--accent-text)' : 'var(--text-tertiary)',
+          fontSize: '14px',
+          lineHeight: 1,
+        }}
+      >
+        🐢
+      </button>
+    </div>
   )
 }
 
@@ -113,16 +147,11 @@ export function SentenceCard({
     <div ref={cardRef} className="w-full">
 
       {/* Progress bar */}
-      <div
-        className="w-full rounded-full mb-6 overflow-hidden"
-        style={{ height: '6px', background: 'var(--bg-tertiary)' }}
-      >
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${(sentenceNumber / totalSentences) * 100}%`,
-            background: 'var(--accent)',
-          }}
+      <div className="mb-6">
+        <ProgressBar
+          value={sentenceNumber}
+          max={totalSentences}
+          aria-label="Round progress"
         />
       </div>
 
@@ -145,7 +174,7 @@ export function SentenceCard({
         )}
       </div>
 
-      {/* Hanzi + speaker button */}
+      {/* Hanzi + speaker buttons */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <p
           className="font-hanzi leading-tight tracking-wide flex-1"
@@ -231,14 +260,15 @@ export function SentenceCard({
           >
             ↵ Enter to submit
           </p>
-          <button
+          <Button
+            variant="primary"
+            icon="ink"
+            className="w-full"
             onClick={onSubmit}
             disabled={!userAnswer.trim() || isSubmitting}
-            className="w-full disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] font-medium rounded-xl py-3 text-sm transition-all hover-accent"
-            style={{ backgroundColor: 'var(--accent)', color: 'white' }}
           >
             {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
+              <span className="flex items-center gap-2">
                 <span
                   className="w-3.5 h-3.5 rounded-full animate-spin"
                   style={{ border: '2px solid white', borderTopColor: 'transparent' }}
@@ -246,7 +276,7 @@ export function SentenceCard({
                 Grading…
               </span>
             ) : 'Submit'}
-          </button>
+          </Button>
         </div>
       )}
 

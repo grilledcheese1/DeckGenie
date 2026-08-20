@@ -2,13 +2,18 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { gsap } from 'gsap'
 import { usePractice } from '@/hooks/usePractice'
 import { useProgress } from '@/hooks/useProgress'
 import { SentenceCard } from '@/components/practice/SentenceCard'
 import { UnlockModal } from '@/components/practice/UnlockModal'
-import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
+import { AppShell } from '@/components/shell/AppShell'
+import { PracticeRightRail } from '@/components/practice/PracticeRightRail'
+import { AnalysisRightRail } from '@/components/practice/AnalysisRightRail'
+import { ScoreRing } from '@/components/practice/ScoreRing'
+import { Badge, getWordStatus } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { getApiKey } from '@/lib/byoKey'
 import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
@@ -52,7 +57,7 @@ function PracticeInner() {
   const searchParams  = useSearchParams()
   const startUnlock   = searchParams.get('unlock') === 'true'
 
-  const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock, canUnlock, reload } = useProgress()
+  const { progress, settings, vocabCount, incrementSentence, finishRound, resetRoundCounter, claimUnlock, canUnlock } = useProgress()
   const { state, fetchSentence, submitAnswer, togglePinyin, setAnswer, restoreSentence } = usePractice(settings?.strictness ?? 2, settings?.practice_mode ?? 'static')
 
   const [showUnlock, setShowUnlock]               = useState(startUnlock)
@@ -69,7 +74,6 @@ function PracticeInner() {
   const [roundSummary,  setRoundSummary]          = useState<RoundSummary | null>(null)
   const [showSummary,   setShowSummary]           = useState(false)
   const [showReview,    setShowReview]            = useState(false)
-  const [settingsOpen,  setSettingsOpen]          = useState(false)
 
   const cardWrapRef      = useRef<HTMLDivElement>(null)
   const userIdRef        = useRef<string | null>(null)
@@ -337,114 +341,113 @@ function PracticeInner() {
   // ── Analysis mode — full-screen takeover ───────────────────────────
   if (analysisMode && state.sentence) {
     return (
-      <div className="flex flex-col min-h-screen px-4 py-8 max-w-lg mx-auto">
-
-        {/* Top nav */}
-        <div className="flex items-center justify-between mb-8">
-          <button
-            onClick={exitAnalysis}
-            className="text-sm flex items-center gap-1.5 transition-colors"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            ← Back to practice
-          </button>
-          <button
-            onClick={exitAnalysis}
-            className="text-xs font-medium transition-opacity hover:opacity-70"
-            style={{ color: 'var(--accent-text)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Done
-          </button>
-        </div>
-
-        <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
-          Tap any character to inspect
-        </p>
-
-        {/* Annotated sentence — mt-16 keeps tooltip above the viewport top */}
-        <div className="mt-16 mb-8">
-          <AnalysisSentence
+      <AppShell
+        rightRail={
+          <AnalysisRightRail
             sentence={state.sentence}
             vocabList={vocabList}
+            grammarFocus={state.grade?.grammarFocus}
+            sentenceStructure={state.grade?.sentenceStructure}
           />
-        </div>
+        }
+      >
+        <div className="flex flex-col min-h-screen px-4 py-8 max-w-lg mx-auto">
 
-        {/* Words in this sentence */}
-        <div
-          className="rounded-2xl p-4 mb-4"
-          style={{ background: 'var(--bg-secondary)', border: '0.5px solid var(--border)' }}
-        >
-          <p
-            className="text-xs uppercase tracking-widest mb-3"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            Words in this sentence
+          {/* Top nav */}
+          <div className="flex items-center justify-between mb-8">
+            <button
+              onClick={exitAnalysis}
+              className="text-sm flex items-center gap-1.5 transition-colors"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              ← Back to practice
+            </button>
+            <button
+              onClick={exitAnalysis}
+              className="text-xs font-medium transition-opacity hover:opacity-70"
+              style={{ color: 'var(--accent-text)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              Done
+            </button>
+          </div>
+
+          {/* Score ring */}
+          {state.grade && (
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <ScoreRing score={state.grade.score} size={72} />
+            </div>
+          )}
+
+          <p className="text-xs mb-4 text-center" style={{ color: 'var(--text-tertiary)' }}>
+            Tap any character to inspect
           </p>
-          <div className="space-y-2">
-            {state.sentence.vocab_used.map(zh => {
-              const word = vocabList.find(w => w.word_zh === zh)
-              if (!word) return null
-              const acc = word.times_seen > 0
-                ? Math.round((word.times_correct / word.times_seen) * 100)
-                : null
-              return (
-                <div key={zh} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="font-hanzi text-lg" style={{ color: 'var(--text-primary)' }}>
-                      {word.word_zh}
-                    </span>
-                    <div>
-                      <span className="text-xs" style={{ color: 'var(--accent-text)' }}>
-                        {word.pinyin}
+
+          {/* Annotated sentence — mt-16 keeps tooltip above the viewport top */}
+          <div className="mt-16 mb-8">
+            <AnalysisSentence
+              sentence={state.sentence}
+              vocabList={vocabList}
+            />
+          </div>
+
+          {/* Words in this sentence */}
+          <div
+            className="rounded-2xl p-4 mb-4"
+            style={{ background: 'var(--bg-secondary)', border: '0.5px solid var(--border)' }}
+          >
+            <p
+              className="text-xs uppercase tracking-widest mb-3"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              Words in this sentence
+            </p>
+            <div className="space-y-2">
+              {state.sentence.vocab_used.map(zh => {
+                const word = vocabList.find(w => w.word_zh === zh)
+                if (!word) return null
+                const status = getWordStatus(word.times_seen, word.times_correct)
+                return (
+                  <div key={zh} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-hanzi text-lg flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
+                        {word.word_zh}
                       </span>
-                      <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
-                        {word.english}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-xs" style={{ color: 'var(--accent-text)' }}>
+                          {word.pinyin}
+                        </span>
+                        <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
+                          {word.english}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge tone={status.tone}>{status.label}</Badge>
+                      <Badge tone={`pos-${word.pos}`}>{word.pos}</Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {acc !== null && (
-                      <span
-                        className="text-xs"
-                        style={{
-                          color: acc >= 70 ? 'var(--accent-text)' : acc >= 40 ? '#fbbf24' : '#f87171',
-                        }}
-                      >
-                        {acc}%
-                      </span>
-                    )}
-                    <span
-                      className="text-xs capitalize px-2 py-0.5 rounded-lg"
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        color: 'var(--text-tertiary)',
-                        border: '0.5px solid var(--border)',
-                      }}
-                    >
-                      {word.pos}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
+
+          {/* Next sentence */}
+          <button
+            onClick={() => { exitAnalysis(); handleNext() }}
+            className="w-full rounded-2xl py-4 text-sm font-medium transition-all active:scale-[0.98] mt-auto hover-accent"
+            style={{ background: 'var(--accent)', color: 'white', border: 'none' }}
+          >
+            Next sentence →
+          </button>
+
         </div>
-
-        {/* Next sentence */}
-        <button
-          onClick={() => { exitAnalysis(); handleNext() }}
-          className="w-full rounded-2xl py-4 text-sm font-medium transition-all active:scale-[0.98] mt-auto hover-accent"
-          style={{ background: 'var(--accent)', color: 'white', border: 'none' }}
-        >
-          Next sentence →
-        </button>
-
-      </div>
+      </AppShell>
     )
   }
 
   // ── Normal practice mode ───────────────────────────────────────────
   return (
+    <AppShell rightRail={<PracticeRightRail />}>
     <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto">
 
       {/* Top nav */}
@@ -474,8 +477,8 @@ function PracticeInner() {
 
           <StreakFlame streak={currentStreak} />
 
-          <button
-            onClick={() => setSettingsOpen(true)}
+          <Link
+            href="/settings"
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover-border"
             style={{
               backgroundColor: 'var(--bg-secondary)',
@@ -487,7 +490,7 @@ function PracticeInner() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
-          </button>
+          </Link>
 
           <button
             onClick={cycleTheme}
@@ -568,9 +571,9 @@ function PracticeInner() {
                   Unlock more words
                 </button>
               )}
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-bg hover-border"
+              <Link
+                href="/settings"
+                className="px-5 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] hover-bg hover-border inline-flex items-center justify-center"
                 style={{
                   backgroundColor: canUnlock ? 'transparent' : 'var(--accent)',
                   border: canUnlock ? '1px solid var(--border)' : 'none',
@@ -578,7 +581,7 @@ function PracticeInner() {
                 }}
               >
                 Open settings
-              </button>
+              </Link>
             </div>
           </div>
         )}
@@ -667,11 +670,8 @@ function PracticeInner() {
           onDone={goToDashboard}
         />
       )}
-
-      {settingsOpen && (
-        <SettingsPanel onClose={() => { reload(); setSettingsOpen(false) }} />
-      )}
     </div>
+    </AppShell>
   )
 }
 
