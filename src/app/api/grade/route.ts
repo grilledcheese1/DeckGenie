@@ -11,6 +11,15 @@ import { GradeRequest, GradeResponse, GrammarFocus, SentenceStructureSegment } f
 // blowing up the grading prompt either way.
 const MAX_SENTENCE_LENGTH = 200
 
+// The combined grade+grammar prompt's response grows with sentence length —
+// sentenceStructure is roughly 14 tokens/segment, so at MAX_SENTENCE_LENGTH
+// (200 chars) the structure array alone can approach ~1000+ tokens on top of
+// the grade fields and grammarFocus explanation. 1500 leaves real headroom
+// for the longest allowed sentence rather than the 700 the prior version
+// used, which could truncate mid-JSON well before 200 chars.
+const GRAMMAR_INCLUSIVE_MAX_TOKENS = 1500
+const GRADE_ONLY_MAX_TOKENS = 200
+
 function isGradeResponse(value: unknown): value is GradeResponse {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
@@ -28,24 +37,44 @@ function isGradeResponse(value: unknown): value is GradeResponse {
 // sentence-level cache columns.
 const STRUCTURE_ROLES = new Set(['S', 'V', 'O', 'Q', 'MW', 'Other'])
 
+// Non-empty checks (M1): a shape-valid-but-empty response (empty strings,
+// empty array) would otherwise pass validation and get permanently cached —
+// re-validation on read only catches shape mismatches, not emptiness, so a
+// degenerate response would never self-heal once written.
 function isGrammarFocus(value: unknown): value is GrammarFocus {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
-  if (typeof v.pattern !== 'string' || typeof v.pinyin !== 'string' || typeof v.explanation !== 'string') {
+  if (typeof v.pattern !== 'string' || !v.pattern.trim()
+    || typeof v.pinyin !== 'string' || !v.pinyin.trim()
+    || typeof v.explanation !== 'string' || !v.explanation.trim()) {
     return false
   }
   if (!v.example || typeof v.example !== 'object') return false
   const e = v.example as Record<string, unknown>
-  return typeof e.zh === 'string' && typeof e.pinyin === 'string' && typeof e.en === 'string'
+  return typeof e.zh === 'string' && e.zh.trim().length > 0
+    && typeof e.pinyin === 'string' && e.pinyin.trim().length > 0
+    && typeof e.en === 'string' && e.en.trim().length > 0
 }
 
 function isSentenceStructure(value: unknown): value is SentenceStructureSegment[] {
-  if (!Array.isArray(value)) return false
+  if (!Array.isArray(value) || value.length === 0) return false
   return value.every(seg => {
     if (!seg || typeof seg !== 'object') return false
     const s = seg as Record<string, unknown>
-    return typeof s.segment === 'string' && typeof s.role === 'string' && STRUCTURE_ROLES.has(s.role)
+    return typeof s.segment === 'string' && s.segment.length > 0
+      && typeof s.role === 'string' && STRUCTURE_ROLES.has(s.role)
   })
+}
+
+// M2: the sentenceStructure segments should losslessly reconstruct the
+// original sentence (the prompt asks for segments "in order"). Without this,
+// a dropped or hallucinated segment is a silent quality bug that gets cached
+// permanently for every user who sees that sentence. Called wherever a
+// sentenceStructure is validated before being accepted/cached — on mismatch
+// the caller treats it exactly like any other invalid grammar response
+// (degrade to null, never fail the overall grade).
+function structureMatchesSentence(structure: SentenceStructureSegment[], sentenceZh: string): boolean {
+  return structure.map(seg => seg.segment).join('') === sentenceZh
 }
 
 function isGrammarAnalysisResponse(
@@ -178,7 +207,9 @@ export async function POST(req: NextRequest) {
   // fields are always trusted but these never are: defense in depth against
   // a malformed row never breaking the response.
   const cachedGrammarFocus = isGrammarFocus(grammar_focus) ? grammar_focus : null
-  const cachedSentenceStructure = isSentenceStructure(sentence_structure) ? sentence_structure : null
+  const cachedSentenceStructure = isSentenceStructure(sentence_structure) && structureMatchesSentence(sentence_structure, sentence_zh)
+    ? sentence_structure
+    : null
   const grammarAlreadyCached = cachedGrammarFocus !== null && cachedSentenceStructure !== null
 
   const truncatedAnswer = user_answer.slice(0, 500)
@@ -241,6 +272,13 @@ Respond with ONLY valid JSON, no markdown:
 
       try {
         const grammar = await callClaudeJson(grammarPrompt, 600, isGrammarAnalysisResponse, anthropicClient)
+        // M2: isGrammarAnalysisResponse can't see sentence_zh (it's a generic
+        // shape validator), so the reconstruction check happens here instead
+        // — a mismatch is treated identically to any other invalid grammar
+        // response below.
+        if (!structureMatchesSentence(grammar.sentenceStructure, sentence_zh)) {
+          throw new ClaudeResponseError('sentenceStructure segments did not reconstruct the original sentence')
+        }
         parsed.grammarFocus = grammar.grammarFocus
         parsed.sentenceStructure = grammar.sentenceStructure
         newGrammarFocus = grammar.grammarFocus
@@ -258,7 +296,7 @@ Respond with ONLY valid JSON, no markdown:
     // doesn't already have one cached — reuse it otherwise.
     const needsGrammarAnalysis = !grammarAlreadyCached
 
-    const prompt = `You are grading a Chinese-to-English translation exercise.
+    const buildGradePrompt = (includeGrammar: boolean) => `You are grading a Chinese-to-English translation exercise.
 
 Chinese sentence: ${sentence_zh}
 Pinyin: ${sentence_py}
@@ -270,12 +308,36 @@ ${truncatedAnswer}
 </student_answer>
 
 Grading mode: ${STRICTNESS[strictness] ?? STRICTNESS[2]}
-${needsGrammarAnalysis ? `\n${GRAMMAR_ANALYSIS_INSTRUCTIONS(sentence_zh)}\n` : ''}
+${includeGrammar ? `\n${GRAMMAR_ANALYSIS_INSTRUCTIONS(sentence_zh)}\n` : ''}
 Respond with ONLY valid JSON, no markdown:
-{"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"${needsGrammarAnalysis ? ',"grammarFocus":{"pattern":"...","pinyin":"...","explanation":"...","example":{"zh":"...","pinyin":"...","en":"..."}},"sentenceStructure":[{"segment":"...","role":"S|V|O|Q|MW|Other"}]' : ''}}`
+{"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"${includeGrammar ? ',"grammarFocus":{"pattern":"...","pinyin":"...","explanation":"...","example":{"zh":"...","pinyin":"...","en":"..."}},"sentenceStructure":[{"segment":"...","role":"S|V|O|Q|MW|Other"}]' : ''}}`
+
+    // Set true only if the grammar-inclusive call failed and grading
+    // succeeded on a grammar-free retry (I2) — gates the validation branch
+    // below so a degraded response is treated the same as "no grammar
+    // requested" rather than re-validating grammar fields that were never
+    // asked for on the retry.
+    let grammarDegraded = false
 
     try {
-      parsed = await callClaudeJson(prompt, needsGrammarAnalysis ? 700 : 200, isGradeResponse, anthropicClient)
+      if (needsGrammarAnalysis) {
+        try {
+          parsed = await callClaudeJson(buildGradePrompt(true), GRAMMAR_INCLUSIVE_MAX_TOKENS, isGradeResponse, anthropicClient)
+        } catch (err) {
+          if (!(err instanceof ClaudeResponseError)) throw err
+          // The grammar-analysis addition to the prompt is optional/best-
+          // effort and must never be able to break the load-bearing grade —
+          // if the combined call failed for any reason (including
+          // truncation, per I3), retry once with the grading-only prompt
+          // before giving up. Only if this retry also fails does the route
+          // 502 below.
+          console.error('Grammar-inclusive grade call failed, retrying grading-only:', err)
+          grammarDegraded = true
+          parsed = await callClaudeJson(buildGradePrompt(false), GRADE_ONLY_MAX_TOKENS, isGradeResponse, anthropicClient)
+        }
+      } else {
+        parsed = await callClaudeJson(buildGradePrompt(false), GRADE_ONLY_MAX_TOKENS, isGradeResponse, anthropicClient)
+      }
     } catch (err) {
       console.error('Grade error:', err)
       const status = err instanceof ClaudeResponseError ? 502 : 500
@@ -286,9 +348,13 @@ Respond with ONLY valid JSON, no markdown:
     // sentenceStructure need their own validation before being trusted, same
     // as the cached-row values above. A malformed/missing block here degrades
     // to null, it never fails the (already-successful) grade.
-    if (needsGrammarAnalysis) {
+    if (needsGrammarAnalysis && !grammarDegraded) {
       const freshGrammarFocus = isGrammarFocus(parsed.grammarFocus) ? parsed.grammarFocus : null
-      const freshSentenceStructure = isSentenceStructure(parsed.sentenceStructure) ? parsed.sentenceStructure : null
+      let freshSentenceStructure = isSentenceStructure(parsed.sentenceStructure) ? parsed.sentenceStructure : null
+      // M2
+      if (freshSentenceStructure && !structureMatchesSentence(freshSentenceStructure, sentence_zh)) {
+        freshSentenceStructure = null
+      }
       parsed.grammarFocus = freshGrammarFocus
       parsed.sentenceStructure = freshSentenceStructure
       if (freshGrammarFocus && freshSentenceStructure) {

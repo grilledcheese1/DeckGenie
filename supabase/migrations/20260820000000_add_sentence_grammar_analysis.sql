@@ -29,11 +29,24 @@ ALTER TABLE public.generated_sentences
 -- identical — plpgsql's IF/CASE is enough to dispatch, and it keeps the
 -- route's call site to one RPC name regardless of practice mode.
 --
--- No ownership check beyond "row exists": sentence_bank is shared read-only
--- content and generated_sentences' grammar/structure fields aren't
--- per-user-sensitive — just a shared cache of that sentence's fixed
--- grammatical structure — so a plain UPDATE ... WHERE id = p_sentence_id is
--- sufficient.
+-- This function is granted EXECUTE to `authenticated`, which is reachable
+-- directly from the browser Supabase client (this app already calls .rpc()
+-- from the client elsewhere) — and sentence_bank/generated_sentences row ids
+-- are readable via their SELECT policies, so both p_table and p_sentence_id
+-- must be treated as attacker-controlled. Two guards on every UPDATE:
+--   - `grammar_focus IS NULL` (write-once): each sentence's grammar/structure
+--     is only ever set once, ever, matching the actual intent (analyze a
+--     sentence's fixed grammar exactly once) and closing the "any
+--     authenticated user can overwrite the shared/another user's cached
+--     analysis with arbitrary jsonb" hole — once set, the row is immutable
+--     via this RPC. This also removes a benign duplicate-write race as a
+--     side effect (two concurrent first-analyses of the same sentence no
+--     longer stomp each other after the first commits).
+--   - generated_sentences additionally requires `user_id = auth.uid()`,
+--     since those rows are per-user (unlike sentence_bank, which is shared
+--     read-only content with no owner column) — without this, any
+--     authenticated caller could target another user's generated_sentences
+--     row by id.
 CREATE FUNCTION public.set_sentence_grammar_analysis(
   p_table              text,
   p_sentence_id        uuid,
@@ -49,12 +62,15 @@ BEGIN
     UPDATE public.sentence_bank
     SET grammar_focus = p_grammar_focus,
         sentence_structure = p_sentence_structure
-    WHERE id = p_sentence_id;
+    WHERE id = p_sentence_id
+      AND grammar_focus IS NULL;
   ELSIF p_table = 'generated_sentences' THEN
     UPDATE public.generated_sentences
     SET grammar_focus = p_grammar_focus,
         sentence_structure = p_sentence_structure
-    WHERE id = p_sentence_id;
+    WHERE id = p_sentence_id
+      AND user_id = auth.uid()
+      AND grammar_focus IS NULL;
   ELSE
     RAISE EXCEPTION 'set_sentence_grammar_analysis: unknown table "%"', p_table;
   END IF;

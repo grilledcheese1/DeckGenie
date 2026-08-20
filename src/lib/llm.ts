@@ -28,6 +28,14 @@ export async function callClaudeJson<T>(
     throw new ClaudeResponseError('Anthropic request failed', err)
   }
 
+  // A truncated response is not "malformed JSON" — it's a caller-fixable
+  // token-budget problem (raise maxTokens) — so it gets its own clearly
+  // labeled error rather than falling through to the generic JSON-parse
+  // failure below, which would otherwise mislabel it.
+  if (message.stop_reason === 'max_tokens') {
+    throw new ClaudeResponseError('Claude response was truncated (hit max_tokens)')
+  }
+
   const block = message.content[0]
   if (block.type !== 'text') {
     throw new ClaudeResponseError(`Expected a text content block, got "${block.type}"`)
