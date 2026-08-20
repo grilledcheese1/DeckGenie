@@ -15,7 +15,7 @@ function SettingsInner() {
     <div className="min-h-screen px-4 py-10 max-w-lg mx-auto">
       <SettingsForm
         mode={isFirstRun ? 'onboarding' : 'edit'}
-        onDone={() => router.push('/dashboard')}
+        onDone={isFirstRun ? () => router.push('/dashboard') : () => router.back()}
         onBack={isFirstRun ? undefined : () => router.back()}
         highlightApiKey={highlightApiKey}
       />
