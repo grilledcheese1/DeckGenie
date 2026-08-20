@@ -34,7 +34,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   const supabase = createClient()
 
   const [settings, setSettings] = useState<Partial<Settings>>({
-    starting_hsk: 2, strictness: 2, sentences_per_round: 10,
+    starting_hsk: 1, strictness: 2, sentences_per_round: 10,
     rounds_before_unlock: 3, words_per_unlock: 5,
     show_pinyin: 'tap', show_hints: 'after',
     practice_mode: 'static',
