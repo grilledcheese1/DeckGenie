@@ -153,21 +153,19 @@ export async function POST(req: NextRequest) {
     sentence_zh: string
     sentence_py: string
     vocab_used: string[]
-    grammar_focus: unknown
-    sentence_structure: unknown
   } | null
 
   const lookupStatic = () =>
     supabase
       .from('sentence_bank')
-      .select('sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure')
+      .select('sentence_zh, sentence_py, vocab_used')
       .eq('id', sentence_id)
       .single()
 
   const lookupAi = () =>
     supabase
       .from('generated_sentences')
-      .select('sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure')
+      .select('sentence_zh, sentence_py, vocab_used')
       .eq('id', sentence_id)
       .eq('user_id', user.id)
       .single()
@@ -195,20 +193,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sentence not found' }, { status: 404 })
   }
 
-  const { sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure } = sentenceRow
+  const { sentence_zh, sentence_py, vocab_used } = sentenceRow
 
   if (sentence_zh.length > MAX_SENTENCE_LENGTH || sentence_py.length > MAX_SENTENCE_LENGTH) {
     return NextResponse.json({ error: 'Sentence data invalid' }, { status: 500 })
   }
 
   // Sentence-level grammar-analysis cache, if this sentence has already been
-  // analyzed by a prior grade of it (by any user). Re-validated here (not
-  // just trusted from the DB) for the same reason isGradeResponse's core
-  // fields are always trusted but these never are: defense in depth against
-  // a malformed row never breaking the response.
-  const cachedGrammarFocus = isGrammarFocus(grammar_focus) ? grammar_focus : null
-  const cachedSentenceStructure = isSentenceStructure(sentence_structure) && structureMatchesSentence(sentence_structure, sentence_zh)
-    ? sentence_structure
+  // analyzed by a prior grade of it (by any user). This is a SEPARATE,
+  // best-effort query from the primary sentence lookup above — grammar_focus
+  // and sentence_structure are new nullable columns that may not exist yet
+  // on the live DB until their migration is applied. If that query included
+  // these columns, PostgREST would reject the ENTIRE query (including
+  // sentence_zh/sentence_py/vocab_used) whenever they're absent, taking down
+  // grading entirely. Isolating them here means a "column does not exist"
+  // failure (or any other failure) degrades to "no cached grammar data" —
+  // it must never abort or fail the overall grade request.
+  let grammarRow: { grammar_focus: unknown; sentence_structure: unknown } | null = null
+  try {
+    let grammarQuery = supabase
+      .from(sourceTable)
+      .select('grammar_focus, sentence_structure')
+      .eq('id', sentence_id)
+    if (sourceTable === 'generated_sentences') {
+      grammarQuery = grammarQuery.eq('user_id', user.id)
+    }
+    const { data, error } = await grammarQuery.single()
+    if (error) {
+      console.error('grammar analysis lookup error:', error.message)
+    } else {
+      grammarRow = data
+    }
+  } catch (err) {
+    console.error('grammar analysis lookup error:', err)
+  }
+
+  // Re-validated here (not just trusted from the DB) for the same reason
+  // isGradeResponse's core fields are always trusted but these never are:
+  // defense in depth against a malformed row never breaking the response.
+  const cachedGrammarFocus = grammarRow && isGrammarFocus(grammarRow.grammar_focus) ? grammarRow.grammar_focus : null
+  const cachedSentenceStructure = grammarRow && isSentenceStructure(grammarRow.sentence_structure) && structureMatchesSentence(grammarRow.sentence_structure, sentence_zh)
+    ? grammarRow.sentence_structure
     : null
   const grammarAlreadyCached = cachedGrammarFocus !== null && cachedSentenceStructure !== null
 
