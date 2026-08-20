@@ -41,7 +41,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [theme, setTheme] = useState<ThemeId>('ink-jade')
+  const [theme, setTheme] = useState<ThemeId>(loadSavedTheme)
   const [loaded, setLoaded] = useState(false)
 
   // API key is local-only — persisted to localStorage, never to Supabase.
@@ -76,7 +76,6 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
     loadSettings()
     return () => { cancelled = true }
   }, [supabase])
-  useEffect(() => { setTheme(loadSavedTheme()) }, [])
   useEffect(() => { const stored = getApiKey(); if (stored) setApiKey(stored) }, [])
 
   // Scroll/focus/highlight the API key input when arriving via a redirect
