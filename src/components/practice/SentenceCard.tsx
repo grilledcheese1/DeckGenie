@@ -12,30 +12,56 @@ type SpeechState = 'idle' | 'normal' | 'slow'
  * `speak()` is the single fetch-and-play implementation, parameterized by
  * `playbackRate` — both the normal-speed and slow-speed buttons call it
  * with a different rate rather than duplicating the fetch/blob/Audio setup.
- * Each click does fetch its own audio blob (there's no cross-click caching),
- * but a single click's slow playback never issues more than the one
- * `/api/speak` request that click already needs.
+ *
+ * The fetched blob is cached in `cacheRef`, keyed on the sentence text it
+ * was fetched for. A click only hits `/api/speak` when no cached blob
+ * exists yet for the current sentence (i.e. the first play at either
+ * speed) — a second click at the other speed for the same sentence reuses
+ * the cached object URL and just plays a new `Audio` at the requested
+ * `playbackRate`, no network request. The cache is invalidated (and its
+ * object URL revoked) whenever `text` changes, via the effect below, so a
+ * new sentence always re-fetches rather than playing stale audio.
  */
 function SpeakerButton({ text }: { text: string }) {
   const [speechState, setSpeechState] = useState<SpeechState>('idle')
+  const cacheRef = useRef<{ text: string; url: string } | null>(null)
+
+  // Invalidate the cached blob whenever the sentence changes, and on
+  // unmount — revokes the previous sentence's object URL so it doesn't
+  // leak, and guarantees the next play() for a new sentence re-fetches
+  // instead of reusing stale audio.
+  useEffect(() => {
+    return () => {
+      if (cacheRef.current) {
+        URL.revokeObjectURL(cacheRef.current.url)
+        cacheRef.current = null
+      }
+    }
+  }, [text])
+
+  async function getAudioUrl(): Promise<string> {
+    if (cacheRef.current && cacheRef.current.text === text) {
+      return cacheRef.current.url
+    }
+    const res = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    if (!res.ok) throw new Error('TTS failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    cacheRef.current = { text, url }
+    return url
+  }
 
   async function speak(rate: number, which: SpeechState) {
     setSpeechState(which)
     try {
-      const res = await fetch('/api/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      if (!res.ok) throw new Error('TTS failed')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const url = await getAudioUrl()
       const audio = new Audio(url)
       audio.playbackRate = rate
-      audio.onended = () => {
-        setSpeechState('idle')
-        URL.revokeObjectURL(url)
-      }
+      audio.onended = () => setSpeechState('idle')
       await audio.play()
     } catch {
       setSpeechState('idle')
