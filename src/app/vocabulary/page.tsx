@@ -37,8 +37,14 @@ export default function VocabularyPage() {
   const [initialFetchStarted, setInitialFetchStarted] = useState(false)
 
   useEffect(() => {
-    open()
-    setInitialFetchStarted(true)
+    // Deferred via an inner async function (matching this codebase's data-
+    // hook convention, e.g. useTodayStats/useWeeklyActivity) rather than
+    // calling setState synchronously in the effect body.
+    async function run() {
+      open()
+      setInitialFetchStarted(true)
+    }
+    run()
     // `open` is intentionally omitted from the dep array — its identity
     // changes on every `filters` update (see useVocabSheet), and
     // filter-driven refetches are already handled by `applyFilter`, so
