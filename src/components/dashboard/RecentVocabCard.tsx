@@ -10,9 +10,9 @@ export function RecentVocabCard() {
 
   return (
     <Card padding="md">
-      <p className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
+      <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
         Recently unlocked
-      </p>
+      </h3>
 
       {loading && (
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Loading…</p>

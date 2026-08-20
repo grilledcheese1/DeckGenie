@@ -5,6 +5,7 @@ import { useProgress } from '@/hooks/useProgress'
 import { useWeeklyActivity } from '@/hooks/useWeeklyActivity'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 /**
  * Surfaces `progress.streak_days` (already fetched by `useProgress`,
@@ -24,13 +25,20 @@ export function StreakCard() {
   // M-T-W-T-F-S-S order regardless of what day it is today.
   const sortedDays = [...days].sort((a, b) => a.dayIndex - b.dayIndex)
 
+  // Loading/error must never be conflated with "no activity" — that would
+  // render a confident, false "zero days practiced" week (exactly the
+  // anti-pattern `useTodayStats`'s doc comment warns against). Show a
+  // neutral/skeleton dot instead, same convention `DailyGoalCard`/`Sidebar`
+  // already use for their daily-goal figures.
+  const unknown = loading || !!error
+
   return (
     <Card padding="md">
       <div className="flex items-center gap-2 mb-1">
         <span aria-hidden="true" className="text-lg">🔥</span>
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+        <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
           {streak} day{streak === 1 ? '' : 's'} streak
-        </p>
+        </h3>
       </div>
       <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
         {progress?.longest_streak_days ? `Best: ${progress.longest_streak_days} days` : 'Keep it going'}
@@ -39,15 +47,31 @@ export function StreakCard() {
       <div className="flex items-center justify-between" role="list" aria-label="This week's activity">
         {DAY_LABELS.map((label, i) => {
           const day = sortedDays.find(d => d.dayIndex === i)
-          const active = !loading && !error && (day?.active ?? false)
+          const active = !unknown && (day?.active ?? false)
+          const dayName = DAY_NAMES[i]
+          // Color alone can't convey state to screen-reader users (WCAG
+          // 1.4.1) — the practiced/not-practiced/unknown state goes on the
+          // `listitem` via `aria-label`, with the full day name since the
+          // bare letter labels are ambiguous (two T's, two S's).
+          const stateLabel = unknown ? 'status unknown' : active ? 'practiced' : 'not practiced'
           return (
-            <div key={i} role="listitem" className="flex flex-col items-center gap-1.5">
+            <div
+              key={i}
+              role="listitem"
+              aria-label={`${dayName}: ${stateLabel}`}
+              className="flex flex-col items-center gap-1.5"
+            >
               <div
                 className="w-2.5 h-2.5 rounded-full transition-colors"
-                style={{ backgroundColor: active ? 'var(--accent)' : 'var(--bg-tertiary)' }}
+                style={{
+                  backgroundColor: active ? 'var(--accent)' : 'var(--bg-tertiary)',
+                  opacity: unknown ? 0.4 : 1,
+                }}
                 aria-hidden="true"
               />
-              <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{label}</span>
+              <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }} aria-hidden="true">
+                {label}
+              </span>
             </div>
           )
         })}

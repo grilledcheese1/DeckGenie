@@ -26,7 +26,7 @@ export function DailyGoalCard() {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="text-base">💧</span>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Daily goal</p>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Daily goal</h3>
         </div>
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {display} / {goal}

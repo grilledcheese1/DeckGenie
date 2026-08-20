@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProgress } from '@/hooks/useProgress'
 import { useTodayStats } from '@/hooks/useTodayStats'
 import { createClient } from '@/lib/supabase/client'
+import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
 import { Card } from '@/components/ui/Card'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
@@ -20,7 +21,7 @@ import { Wordmark } from './Wordmark'
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { settings } = useProgress()
+  const { settings, reload } = useProgress()
   const { sentencesDone, loading: statsLoading, error: statsError } = useTodayStats()
 
   const [email, setEmail] = useState<string | null>(null)
@@ -41,6 +42,19 @@ export function Sidebar() {
       })
     return () => { cancelled = true }
   }, [])
+
+  // Sidebar holds its own independent `useProgress()` instance, separate
+  // from the dashboard page's — without this, changing the HSK level via
+  // the dashboard's pill would leave this chip showing the stale level
+  // until a route change or full refresh. Same cross-component pattern
+  // `THEME_CHANGE_EVENT` uses to keep the dashboard's neon signs in sync.
+  useEffect(() => {
+    function onSettingsChange() {
+      reload()
+    }
+    window.addEventListener(SETTINGS_CHANGE_EVENT, onSettingsChange)
+    return () => window.removeEventListener(SETTINGS_CHANGE_EVENT, onSettingsChange)
+  }, [reload])
 
   // Move focus into the dropdown when it opens.
   useEffect(() => {

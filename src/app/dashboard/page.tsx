@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
 import { THEME_CHANGE_EVENT, themeToSignMode, type ThemeId } from '@/lib/theme'
+import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
 import type { Settings } from '@/types'
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6] as const
@@ -66,6 +67,7 @@ export default function DashboardPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [hasDraft, setHasDraft] = useState(false)
   const [hskSaving, setHskSaving] = useState(false)
+  const [hskError, setHskError] = useState<string | null>(null)
   const [signMode, setSignMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
     const saved = (localStorage.getItem('hanzi-theme') ?? 'ink-jade') as ThemeId
@@ -134,25 +136,40 @@ export default function DashboardPage() {
   // Wires the "HSK N ▾" pill to the same settings-update path
   // `SettingsForm.handleSave` uses (`supabase.from('settings').update(...)`),
   // then reloads progress/settings via `useProgress`'s `reload` so the rest
-  // of the dashboard (and the Sidebar's own `useProgress()` instance, on its
-  // next mount/read) reflects the change.
+  // of this page reflects the change. `Sidebar` holds its own separate
+  // `useProgress()` instance though, so on success we also dispatch
+  // `SETTINGS_CHANGE_EVENT` (same cross-component pattern `THEME_CHANGE_EVENT`
+  // uses) so Sidebar's chip reloads and doesn't show a stale HSK level.
+  //
+  // A failed save (or a missing `user`) surfaces via `hskError` instead of
+  // being swallowed — `reload()` still runs in `finally` and will snap the
+  // `<select>` back to the last-saved value, but now with a visible reason
+  // instead of an unexplained silent revert.
   async function handleHskChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const nextHsk = Number(e.target.value) as Settings['starting_hsk']
     if (nextHsk === settings?.starting_hsk) return
     setHskSaving(true)
+    setHskError(null)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { error } = await supabase
-          .from('settings')
-          .update({ starting_hsk: nextHsk })
-          .eq('user_id', user.id)
-        if (error) console.error('Failed to update starting_hsk:', error.message)
+      if (!user) {
+        setHskError('Could not save — please sign in again.')
+        return
       }
-      await reload()
+      const { error } = await supabase
+        .from('settings')
+        .update({ starting_hsk: nextHsk })
+        .eq('user_id', user.id)
+      if (error) {
+        console.error('Failed to update starting_hsk:', error.message)
+        setHskError('Could not save HSK level. Please try again.')
+        return
+      }
+      window.dispatchEvent(new CustomEvent(SETTINGS_CHANGE_EVENT))
     } finally {
       setHskSaving(false)
+      await reload()
     }
   }
 
@@ -192,36 +209,43 @@ export default function DashboardPage() {
         <div className="relative" style={{ zIndex: 1 }}>
 
         {/* Vocab count + HSK level control */}
-        <div className="dash-card flex items-center justify-between mb-8">
+        <div className="dash-card flex items-start justify-between mb-8">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             {vocabCount} words active
           </p>
 
-          <div className="relative inline-flex items-center">
-            <select
-              value={settings?.starting_hsk ?? 1}
-              onChange={handleHskChange}
-              disabled={hskSaving}
-              aria-label="Starting HSK level"
-              className="appearance-none rounded-full pl-3 pr-7 py-1.5 text-xs font-medium transition-all hover-border disabled:opacity-60 cursor-pointer"
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {HSK_LEVELS.map(level => (
-                <option key={level} value={level}>HSK {level}</option>
-              ))}
-            </select>
-            <svg
-              width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className="absolute right-2.5 pointer-events-none"
-              style={{ color: 'var(--text-tertiary)' }}
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+          <div className="flex flex-col items-end gap-1">
+            <div className="relative inline-flex items-center">
+              <select
+                value={settings?.starting_hsk ?? 1}
+                onChange={handleHskChange}
+                disabled={hskSaving}
+                aria-label="Starting HSK level"
+                className="appearance-none rounded-full pl-3 pr-7 py-1.5 text-xs font-medium transition-all hover-border disabled:opacity-60 cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {HSK_LEVELS.map(level => (
+                  <option key={level} value={level}>HSK {level}</option>
+                ))}
+              </select>
+              <svg
+                width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className="absolute right-2.5 pointer-events-none"
+                style={{ color: 'var(--text-tertiary)' }}
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+            {hskError && (
+              <p className="text-xs" style={{ color: 'var(--error-text)' }} role="alert">
+                {hskError}
+              </p>
+            )}
           </div>
         </div>
 
