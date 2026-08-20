@@ -54,6 +54,14 @@ export function useReviewHistory() {
   const [hasMore, setHasMore]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const offsetRef               = useRef(0)
+  // Structural concurrency guard for `loadMore` — the `loading` state
+  // value read inside the callback closure is timing-dependent (two
+  // `loadMore()` calls in the same render flush can both read
+  // `loading === false` before either's `setLoading(true)` commits,
+  // fetching the same offset twice and appending duplicate rows). This
+  // ref is set/cleared synchronously, independent of React's render
+  // cycle, so it's airtight against that race.
+  const inFlightRef             = useRef(false)
 
   useEffect(() => {
     let ignore = false
@@ -104,7 +112,8 @@ export function useReviewHistory() {
   }, [])
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return
+    if (inFlightRef.current || loading || !hasMore) return
+    inFlightRef.current = true
     setLoading(true)
     try {
       const supabase = createClient()
@@ -121,6 +130,11 @@ export function useReviewHistory() {
       if (queryError) {
         console.error('useReviewHistory: failed to load more sentence_attempts:', queryError.message)
         setError(queryError.message)
+        // A failed query becomes a terminal state (surfaced via `error`)
+        // rather than leaving `hasMore: true` — otherwise `/review`'s
+        // scroll-proximity handler re-fires this same failing query on
+        // every subsequent scroll tick, retrying forever.
+        setHasMore(false)
         setLoading(false)
         return
       }
@@ -135,7 +149,10 @@ export function useReviewHistory() {
       const message = e instanceof Error ? e.message : 'Unknown error'
       console.error('useReviewHistory: failed to load more sentence_attempts:', message)
       setError(message)
+      setHasMore(false)
       setLoading(false)
+    } finally {
+      inFlightRef.current = false
     }
   }, [loading, hasMore])
 

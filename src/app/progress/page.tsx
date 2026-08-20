@@ -4,7 +4,7 @@ import { AppShell } from '@/components/shell/AppShell'
 import { Card } from '@/components/ui/Card'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useProgress } from '@/hooks/useProgress'
-import { useDailyStatsHistory } from '@/hooks/useDailyStatsHistory'
+import { useDailyStatsHistory, HISTORY_DAYS } from '@/hooks/useDailyStatsHistory'
 
 const STAT_ICONS = {
   rounds: '🔁',
@@ -121,8 +121,8 @@ export default function ProgressPage() {
                 <div
                   className="flex items-end gap-1.5"
                   style={{ height: '96px', opacity: historyLoading ? 0.5 : 1 }}
-                  role="img"
-                  aria-label={`Sentences practiced per day over the last ${days.length} days`}
+                  role="list"
+                  aria-label={`Sentences practiced per day over the last ${HISTORY_DAYS} days`}
                 >
                   {days.map(day => {
                     const pct = day.sentencesDone > 0
@@ -133,16 +133,24 @@ export default function ProgressPage() {
                       : null
                     const label = new Date(day.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                     const dayNum = day.date.slice(8, 10).replace(/^0/, '')
+                    // `role="img"` is a leaf role — descendant content
+                    // (including a per-bar `title`) is invisible to
+                    // assistive tech. Using `role="list"` on the
+                    // container + `role="listitem"` + `aria-label` here
+                    // (mirroring `StreakCard.tsx`'s pattern) exposes each
+                    // day's actual value instead of just the container's
+                    // generic label.
+                    const dayLabel = day.sentencesDone > 0
+                      ? `${label}: ${day.sentencesDone} sentences, ${accuracy}% accuracy`
+                      : `${label}: no practice`
 
                     return (
                       <div
                         key={day.date}
+                        role="listitem"
+                        aria-label={dayLabel}
                         className="flex-1 h-full flex flex-col items-center justify-end gap-1"
-                        title={
-                          day.sentencesDone > 0
-                            ? `${label}: ${day.sentencesDone} sentences, ${accuracy}% accuracy`
-                            : `${label}: no practice`
-                        }
+                        title={dayLabel}
                       >
                         <div
                           className="w-full rounded-t-md transition-all duration-300"
@@ -151,8 +159,9 @@ export default function ProgressPage() {
                             minHeight: day.sentencesDone > 0 ? '4px' : '2px',
                             backgroundColor: day.sentencesDone > 0 ? 'var(--accent)' : 'var(--bg-tertiary)',
                           }}
+                          aria-hidden="true"
                         />
-                        <span className="text-[9px]" style={{ color: 'var(--text-tertiary)' }}>
+                        <span className="text-[9px]" style={{ color: 'var(--text-tertiary)' }} aria-hidden="true">
                           {dayNum}
                         </span>
                       </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/shell/AppShell'
 import { VocabBrowser } from '@/components/vocab/VocabBrowser'
 import { useVocabSheet } from '@/hooks/useVocabSheet'
@@ -24,13 +24,28 @@ export default function VocabularyPage() {
     open, loadMore, applyFilter, removeWord,
   } = useVocabSheet()
 
-  // Load the initial page once on mount. `open` is intentionally omitted
-  // from the dep array — its identity changes on every `filters` update
-  // (see useVocabSheet), and filter-driven refetches are already handled
-  // by `applyFilter`, so including it here would refetch on every filter
-  // change in addition to `applyFilter` already doing so.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { open() }, [])
+  // `useVocabSheet` initializes `loading: false` and only starts fetching
+  // once `open()` runs inside the effect below (deferred past first
+  // paint) — deliberately so, since `VocabSheet`'s dashboard call site
+  // batches `setSheetOpen(true)` with `openVocab()` so `loading` is
+  // already `true` on its very first render. This page has no such
+  // batching, so without this flag the very first committed render would
+  // see `words: [], loading: false` and flash `VocabBrowser`'s "No words
+  // found" empty state before the fetch has even started. Tracked here,
+  // locally, rather than changing `useVocabSheet` itself (which would
+  // risk `VocabSheet`'s existing behavior).
+  const [initialFetchStarted, setInitialFetchStarted] = useState(false)
+
+  useEffect(() => {
+    open()
+    setInitialFetchStarted(true)
+    // `open` is intentionally omitted from the dep array — its identity
+    // changes on every `filters` update (see useVocabSheet), and
+    // filter-driven refetches are already handled by `applyFilter`, so
+    // including it here would refetch on every filter change in addition
+    // to `applyFilter` already doing so.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <AppShell>
@@ -44,7 +59,7 @@ export default function VocabularyPage() {
 
         <VocabBrowser
           words={words}
-          loading={loading}
+          loading={!initialFetchStarted || loading}
           hasMore={hasMore}
           filters={filters}
           totalCount={vocabCount}

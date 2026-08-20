@@ -10,7 +10,10 @@ export interface DailyStatPoint {
   sentencesCorrect: number
 }
 
-const HISTORY_DAYS = 14
+/** Exported so callers (e.g. the `/progress` page's aria-label) can refer
+ *  to the requested window size without depending on `days.length`, which
+ *  is `0` until the first fetch resolves. */
+export const HISTORY_DAYS = 14
 
 /**
  * Last 14 calendar days of `daily_stats` rows for the `/progress` page's

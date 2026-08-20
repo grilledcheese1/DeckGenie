@@ -63,6 +63,13 @@ export function VocabBrowser({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list')
 
+  // A brand-new user with zero unlocked vocabulary and a user who has
+  // vocabulary but filtered it down to zero results need different
+  // messaging — "adjust your filters" is confusing when no filter is even
+  // active (e.g. a first-time visit to the new `/vocabulary` page before
+  // ever practicing).
+  const hasActiveFilters = Boolean(filters.hsk || filters.pos || filters.topic || filters.search)
+
   function handleRemove(id: string, el: HTMLElement) {
     gsap.to(el, {
       opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 0,
@@ -188,8 +195,17 @@ export function VocabBrowser({
         >
           {words.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center h-40 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              <p>No words found</p>
-              <p className="text-xs mt-1">Try adjusting your filters</p>
+              {hasActiveFilters ? (
+                <>
+                  <p>No words found</p>
+                  <p className="text-xs mt-1">Try adjusting your filters</p>
+                </>
+              ) : (
+                <>
+                  <p>No words unlocked yet</p>
+                  <p className="text-xs mt-1">Practice to unlock your first words</p>
+                </>
+              )}
             </div>
           )}
 
