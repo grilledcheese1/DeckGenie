@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { gsap } from 'gsap'
+import { useTypewriterCycle } from '@/hooks/useTypewriterCycle'
 import type { SignMode } from './NeonSign'
 
 interface NeonSignHProps {
@@ -17,33 +16,17 @@ interface NeonSignHProps {
   style?:          React.CSSProperties
 }
 
-type SignPhase =
-  | 'warmup'
-  | 'typing-en'
-  | 'hold-en'
-  | 'erasing-en'
-  | 'typing-zh'
-  | 'hold-zh'
-
-const CHAR_TYPE_SPEED  = 80
-const CHAR_ERASE_SPEED = 55
-const HOLD_DURATION    = 1800
-const RESTART_DELAY    = 3500
-
 export function NeonSignH({
   english, chinese, color,
   delay = 0, size = 1, mode = 'neon', fadeInDuration = 1.5, glowColor = '', className = '', style = {},
 }: NeonSignHProps) {
-  const borderRef                     = useRef<HTMLDivElement>(null)
-  const [displayText, setDisplayText] = useState('')
-  const [isEnglish, setIsEnglish]     = useState(true)
-  const [phase, setPhase]             = useState<SignPhase>('warmup')
-  const [glowOn, setGlowOn]           = useState(false)
-  const timeoutsRef                   = useRef<ReturnType<typeof setTimeout>[]>([])
-  const runCycleRef                   = useRef<(() => void) | undefined>(undefined)
-
   const isNeon = mode === 'neon'
   const effectiveGlowColor = glowColor || color
+
+  const { borderRef, displayText, isEnglish, phase, glowOn } = useTypewriterCycle({
+    english, chinese, delay, mode, effectiveGlowColor,
+  })
+
   const S = mode === 'vermillion' ? {
     bg:          'rgba(192,57,43,0.06)',
     border:      '1.5px solid rgba(192,57,43,0.5)',
@@ -72,102 +55,6 @@ export function NeonSignH({
     dotColor:    color,
     dotShadow:   `0 0 6px 2px ${effectiveGlowColor}`,
   }
-
-  function clearAll() {
-    timeoutsRef.current.forEach(clearTimeout)
-    timeoutsRef.current = []
-  }
-
-  function after(ms: number, fn: () => void) {
-    const t = setTimeout(fn, ms)
-    timeoutsRef.current.push(t)
-  }
-
-  const runCycle = useCallback(() => {
-    clearAll()
-
-    setIsEnglish(true)
-    setPhase('typing-en')
-    setDisplayText('')
-
-    let i = 0
-    function typeEn() {
-      if (i <= english.length) {
-        setDisplayText(english.slice(0, i))
-        i++
-        after(CHAR_TYPE_SPEED, typeEn)
-      } else {
-        setPhase('hold-en')
-        after(HOLD_DURATION, () => {
-          setPhase('erasing-en')
-          let j = english.length
-          function eraseEn() {
-            if (j >= 0) {
-              setDisplayText(english.slice(0, j))
-              j--
-              after(CHAR_ERASE_SPEED, eraseEn)
-            } else {
-              setIsEnglish(false)
-              setPhase('typing-zh')
-              setDisplayText('')
-              let k = 0
-              function typeZh() {
-                if (k <= chinese.length) {
-                  setDisplayText(chinese.slice(0, k))
-                  k++
-                  after(CHAR_TYPE_SPEED * 1.3, typeZh)
-                } else {
-                  setPhase('hold-zh')
-                  after(HOLD_DURATION * 1.5, () => {
-                    after(RESTART_DELAY, () => runCycleRef.current?.())
-                  })
-                }
-              }
-              typeZh()
-            }
-          }
-          eraseEn()
-        })
-      }
-    }
-    typeEn()
-  }, [english, chinese])
-
-  runCycleRef.current = runCycle
-
-  useEffect(() => {
-    const warmup = setTimeout(() => {
-      setGlowOn(true)
-      setPhase('warmup')
-      after(1200, runCycle)
-    }, delay * 1000)
-
-    return () => {
-      clearTimeout(warmup)
-      clearAll()
-    }
-  }, [delay, runCycle]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!borderRef.current) return
-    gsap.killTweensOf(borderRef.current, 'boxShadow')
-    if (mode !== 'neon') {
-      gsap.set(borderRef.current, { boxShadow: 'none' })
-      return
-    }
-    if (phase === 'hold-en' || phase === 'hold-zh') {
-      gsap.to(borderRef.current, {
-        boxShadow: `0 0 18px 4px ${effectiveGlowColor}, inset 0 0 12px 2px ${effectiveGlowColor}`,
-        duration: 0.6,
-        ease: 'power2.out',
-      })
-    } else {
-      gsap.to(borderRef.current, {
-        boxShadow: `0 0 8px 1px ${effectiveGlowColor}, inset 0 0 4px 1px ${effectiveGlowColor}`,
-        duration: 0.4,
-      })
-    }
-  }, [phase, glowColor, mode])
 
   const borderClassName = `relative inline-flex items-center px-4 py-3 rounded-lg`
 

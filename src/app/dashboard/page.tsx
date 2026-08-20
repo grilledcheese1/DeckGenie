@@ -14,6 +14,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar'
 import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
+import { NEON_SIGN_COLOR, neonGlowFor } from '@/lib/neonSignPresets'
 import { THEME_CHANGE_EVENT, themeToSignMode, type ThemeId } from '@/lib/theme'
 import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
 import type { Settings } from '@/types'
@@ -198,13 +199,13 @@ export default function DashboardPage() {
       <div ref={containerRef} className="min-h-screen px-4 py-8 max-w-lg mx-auto">
         {/* Neon signs — dashboard background. Adjust style={{ }} per sign to reposition. */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.13, zIndex: 0 }} aria-hidden="true">
-          <NeonSign english="MASTER"    chinese="融会贯通 " color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={4} delay={0}   mode={signMode} className="absolute" style={{ left: '-28%',  top: '8%' }} />
-          <NeonSign english="PERSIST"  chinese="坚持" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={2.5} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-51%' }} />
-          <NeonSign english="INKITSU"  chinese="音吉" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined} size={1.7} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-48%' }} />
+          <NeonSign english="MASTER"    chinese="融会贯通 " color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)} size={4} delay={0}   mode={signMode} className="absolute" style={{ left: '-28%',  top: '8%' }} />
+          <NeonSign english="PERSIST"  chinese="坚持" color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)} size={2.5} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-51%' }} />
+          <NeonSign english="INKITSU"  chinese="音吉" color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)} size={1.7} delay={1} mode={signMode} className="absolute" style={{ left: '-40%',  top: '-48%' }} />
 
-          <NeonSign english="LEARNING" chinese="沉浸式学习" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={3.3} delay={1.3} mode={signMode} className="absolute" style={{ left: '40%',  bottom: '120%' }} />
-          <NeonSign english="CULTIVATION" chinese="语感培养" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={2.3} delay={1.8} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '126%' }} />
-          <NeonSign english="JOURNEY OF MANY MILES" chinese="千里之行，始于足下" color="#51C2BA" glowColor={signMode === 'neon' ? "rgba(0,255,245,0.35)" : undefined}  size={1.3} delay={2.2} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '200%' }} />
+          <NeonSign english="LEARNING" chinese="沉浸式学习" color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)}  size={3.3} delay={1.3} mode={signMode} className="absolute" style={{ left: '40%',  bottom: '120%' }} />
+          <NeonSign english="CULTIVATION" chinese="语感培养" color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)}  size={2.3} delay={1.8} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '126%' }} />
+          <NeonSign english="JOURNEY OF MANY MILES" chinese="千里之行，始于足下" color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)}  size={1.3} delay={2.2} mode={signMode} className="absolute" style={{ left: '29%',  bottom: '200%' }} />
         </div>
         <div className="relative" style={{ zIndex: 1 }}>
 
