@@ -93,11 +93,25 @@ export interface GradeRequest {
   strictness: 1 | 2 | 3
 }
 
+export interface GrammarFocus {
+  pattern: string       // e.g. "过 (guò) — Aspect Marker"
+  pinyin: string         // e.g. "guò"
+  explanation: string    // 1-2 sentences explaining the grammar point
+  example: { zh: string; pinyin: string; en: string }
+}
+
+export interface SentenceStructureSegment {
+  segment: string
+  role: 'S' | 'V' | 'O' | 'Q' | 'MW' | 'Other'
+}
+
 export interface GradeResponse {
   correct: boolean
   score: number
   feedback: string
   correct_answer: string
+  grammarFocus?: GrammarFocus | null
+  sentenceStructure?: SentenceStructureSegment[] | null
 }
 
 export interface WordsRequest {

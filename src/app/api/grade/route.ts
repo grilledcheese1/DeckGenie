@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { requireUser } from '@/lib/api/auth'
 import { checkRateLimit } from '@/lib/api/ratelimit'
 import { callClaudeJson, ClaudeResponseError } from '@/lib/llm'
-import { GradeRequest, GradeResponse } from '@/types'
+import { GradeRequest, GradeResponse, GrammarFocus, SentenceStructureSegment } from '@/types'
 
 // Applies regardless of source table — sentence text is always server-issued,
 // never client-supplied, but a defensive cap keeps a bad/oversized row from
@@ -19,6 +19,46 @@ function isGradeResponse(value: unknown): value is GradeResponse {
     && typeof v.feedback === 'string'
     && typeof v.correct_answer === 'string'
 }
+
+// grammarFocus/sentenceStructure are optional/best-effort on GradeResponse —
+// isGradeResponse deliberately doesn't check them (a malformed or missing
+// structured block must never fail grading, which is the load-bearing part
+// of the response). These validate them separately wherever they're used,
+// on both freshly-generated Claude output and values loaded back out of the
+// sentence-level cache columns.
+const STRUCTURE_ROLES = new Set(['S', 'V', 'O', 'Q', 'MW', 'Other'])
+
+function isGrammarFocus(value: unknown): value is GrammarFocus {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  if (typeof v.pattern !== 'string' || typeof v.pinyin !== 'string' || typeof v.explanation !== 'string') {
+    return false
+  }
+  if (!v.example || typeof v.example !== 'object') return false
+  const e = v.example as Record<string, unknown>
+  return typeof e.zh === 'string' && typeof e.pinyin === 'string' && typeof e.en === 'string'
+}
+
+function isSentenceStructure(value: unknown): value is SentenceStructureSegment[] {
+  if (!Array.isArray(value)) return false
+  return value.every(seg => {
+    if (!seg || typeof seg !== 'object') return false
+    const s = seg as Record<string, unknown>
+    return typeof s.segment === 'string' && typeof s.role === 'string' && STRUCTURE_ROLES.has(s.role)
+  })
+}
+
+function isGrammarAnalysisResponse(
+  value: unknown
+): value is { grammarFocus: GrammarFocus; sentenceStructure: SentenceStructureSegment[] } {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return isGrammarFocus(v.grammarFocus) && isSentenceStructure(v.sentenceStructure)
+}
+
+const GRAMMAR_ANALYSIS_INSTRUCTIONS = (sentenceZh: string) => `Also analyze this sentence's grammar, once — this analysis is independent of whether the student's answer was right or wrong, and is cached for reuse by other students of the same sentence:
+- "grammarFocus": the single most notable/teachable grammar point in the sentence. An object with "pattern" (e.g. "过 (guò) — Aspect Marker"), "pinyin" (just the pinyin for that pattern, e.g. "guò"), "explanation" (1-2 sentences explaining the grammar point), and "example" (a different short example sentence demonstrating the same grammar point, as {"zh":"...","pinyin":"...","en":"..."}).
+- "sentenceStructure": an array segmenting the Chinese sentence "${sentenceZh}" into its words/segments in order, each as {"segment":"the Chinese text of that word/segment","role":"one of S (subject), V (verb), O (object), Q (question particle), MW (measure word), Other"}.`
 
 const STRICTNESS: Record<number, string> = {
   1: 'Lenient: accept if the core meaning is conveyed, ignore grammar/phrasing errors',
@@ -80,31 +120,43 @@ export async function POST(req: NextRequest) {
   // if the user switches modes (via the settings slide-in) between fetching
   // a sentence and submitting an answer — so fall back to the other table
   // before giving up.
-  type SentenceRow = { sentence_zh: string; sentence_py: string; vocab_used: string[] } | null
+  type SentenceRow = {
+    sentence_zh: string
+    sentence_py: string
+    vocab_used: string[]
+    grammar_focus: unknown
+    sentence_structure: unknown
+  } | null
 
   const lookupStatic = () =>
     supabase
       .from('sentence_bank')
-      .select('sentence_zh, sentence_py, vocab_used')
+      .select('sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure')
       .eq('id', sentence_id)
       .single()
 
   const lookupAi = () =>
     supabase
       .from('generated_sentences')
-      .select('sentence_zh, sentence_py, vocab_used')
+      .select('sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure')
       .eq('id', sentence_id)
       .eq('user_id', user.id)
       .single()
 
   let sentenceRow: SentenceRow = null
   let sentenceError: unknown = null
+  // Which table sentenceRow actually came from — needed later to write the
+  // grammar-analysis cache back to the right table via the RPC, since the
+  // primary lookup can fall back to the other table (see comment above).
+  let sourceTable: 'sentence_bank' | 'generated_sentences' =
+    practiceMode === 'static' ? 'sentence_bank' : 'generated_sentences'
 
   const primary = await (practiceMode === 'static' ? lookupStatic() : lookupAi())
   sentenceRow = primary.data
   sentenceError = primary.error
 
   if (!sentenceRow) {
+    sourceTable = practiceMode === 'static' ? 'generated_sentences' : 'sentence_bank'
     const fallback = await (practiceMode === 'static' ? lookupAi() : lookupStatic())
     sentenceRow = fallback.data
     sentenceError = fallback.error
@@ -114,11 +166,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sentence not found' }, { status: 404 })
   }
 
-  const { sentence_zh, sentence_py, vocab_used } = sentenceRow
+  const { sentence_zh, sentence_py, vocab_used, grammar_focus, sentence_structure } = sentenceRow
 
   if (sentence_zh.length > MAX_SENTENCE_LENGTH || sentence_py.length > MAX_SENTENCE_LENGTH) {
     return NextResponse.json({ error: 'Sentence data invalid' }, { status: 500 })
   }
+
+  // Sentence-level grammar-analysis cache, if this sentence has already been
+  // analyzed by a prior grade of it (by any user). Re-validated here (not
+  // just trusted from the DB) for the same reason isGradeResponse's core
+  // fields are always trusted but these never are: defense in depth against
+  // a malformed row never breaking the response.
+  const cachedGrammarFocus = isGrammarFocus(grammar_focus) ? grammar_focus : null
+  const cachedSentenceStructure = isSentenceStructure(sentence_structure) ? sentence_structure : null
+  const grammarAlreadyCached = cachedGrammarFocus !== null && cachedSentenceStructure !== null
 
   const truncatedAnswer = user_answer.slice(0, 500)
 
@@ -142,6 +203,13 @@ export async function POST(req: NextRequest) {
   if (cacheError) console.error('find_cached_grade error:', cacheError.message)
 
   let parsed: GradeResponse
+  // Set only when this request generated a NEW grammar analysis via Claude
+  // (as opposed to reusing sentenceRow's already-cached values) — gates the
+  // best-effort sentence-level cache write-back below. Both must be non-null
+  // together before writing back, since the two columns are always written
+  // as a pair.
+  let newGrammarFocus: GrammarFocus | null = null
+  let newSentenceStructure: SentenceStructureSegment[] | null = null
 
   if (cached) {
     parsed = {
@@ -150,7 +218,46 @@ export async function POST(req: NextRequest) {
       feedback: cached.feedback,
       correct_answer: cached.correct_answer,
     }
+
+    if (grammarAlreadyCached) {
+      // Score/feedback AND grammar analysis both already cached — attach and
+      // skip Claude entirely for this request.
+      parsed.grammarFocus = cachedGrammarFocus
+      parsed.sentenceStructure = cachedSentenceStructure
+    } else {
+      // Score/feedback came from the cache, but this sentence has never had
+      // its grammar analyzed (e.g. this exact answer was cached before this
+      // feature existed). No need to re-grade — a separate, smaller Claude
+      // call fills in just the grammar analysis.
+      const grammarPrompt = `You are analyzing the grammar of a Chinese sentence for a language-learning app.
+
+Chinese sentence: ${sentence_zh}
+Pinyin: ${sentence_py}
+
+${GRAMMAR_ANALYSIS_INSTRUCTIONS(sentence_zh)}
+
+Respond with ONLY valid JSON, no markdown:
+{"grammarFocus":{"pattern":"...","pinyin":"...","explanation":"...","example":{"zh":"...","pinyin":"...","en":"..."}},"sentenceStructure":[{"segment":"...","role":"S|V|O|Q|MW|Other"}]}`
+
+      try {
+        const grammar = await callClaudeJson(grammarPrompt, 600, isGrammarAnalysisResponse, anthropicClient)
+        parsed.grammarFocus = grammar.grammarFocus
+        parsed.sentenceStructure = grammar.sentenceStructure
+        newGrammarFocus = grammar.grammarFocus
+        newSentenceStructure = grammar.sentenceStructure
+      } catch (err) {
+        // Grammar analysis is supplementary — a failure here must never
+        // break a response that already has a valid cached score/feedback.
+        console.error('Grammar analysis error:', err)
+        parsed.grammarFocus = null
+        parsed.sentenceStructure = null
+      }
+    }
   } else {
+    // Only ask Claude to (re-)do the grammar analysis if this sentence
+    // doesn't already have one cached — reuse it otherwise.
+    const needsGrammarAnalysis = !grammarAlreadyCached
+
     const prompt = `You are grading a Chinese-to-English translation exercise.
 
 Chinese sentence: ${sentence_zh}
@@ -163,16 +270,34 @@ ${truncatedAnswer}
 </student_answer>
 
 Grading mode: ${STRICTNESS[strictness] ?? STRICTNESS[2]}
-
+${needsGrammarAnalysis ? `\n${GRAMMAR_ANALYSIS_INSTRUCTIONS(sentence_zh)}\n` : ''}
 Respond with ONLY valid JSON, no markdown:
-{"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"}`
+{"correct":true or false,"score":0-100,"feedback":"one concise sentence","correct_answer":"the most natural English translation"${needsGrammarAnalysis ? ',"grammarFocus":{"pattern":"...","pinyin":"...","explanation":"...","example":{"zh":"...","pinyin":"...","en":"..."}},"sentenceStructure":[{"segment":"...","role":"S|V|O|Q|MW|Other"}]' : ''}}`
 
     try {
-      parsed = await callClaudeJson(prompt, 200, isGradeResponse, anthropicClient)
+      parsed = await callClaudeJson(prompt, needsGrammarAnalysis ? 700 : 200, isGradeResponse, anthropicClient)
     } catch (err) {
       console.error('Grade error:', err)
       const status = err instanceof ClaudeResponseError ? 502 : 500
       return NextResponse.json({ error: 'Grading failed' }, { status })
+    }
+
+    // isGradeResponse only validates the 4 load-bearing fields — grammarFocus/
+    // sentenceStructure need their own validation before being trusted, same
+    // as the cached-row values above. A malformed/missing block here degrades
+    // to null, it never fails the (already-successful) grade.
+    if (needsGrammarAnalysis) {
+      const freshGrammarFocus = isGrammarFocus(parsed.grammarFocus) ? parsed.grammarFocus : null
+      const freshSentenceStructure = isSentenceStructure(parsed.sentenceStructure) ? parsed.sentenceStructure : null
+      parsed.grammarFocus = freshGrammarFocus
+      parsed.sentenceStructure = freshSentenceStructure
+      if (freshGrammarFocus && freshSentenceStructure) {
+        newGrammarFocus = freshGrammarFocus
+        newSentenceStructure = freshSentenceStructure
+      }
+    } else {
+      parsed.grammarFocus = cachedGrammarFocus
+      parsed.sentenceStructure = cachedSentenceStructure
     }
   }
 
@@ -206,7 +331,23 @@ Respond with ONLY valid JSON, no markdown:
     if (error) console.error('sentence_attempts insert error:', error.message)
   })
 
-  waitUntil(Promise.allSettled([recordAttempts, insertAttempt]))
+  // Sentence-level grammar-analysis cache write-back — best-effort and
+  // non-blocking, same as the tracking writes above. Only fires when this
+  // request actually generated a NEW analysis via Claude; reused cached
+  // values never re-write. A failure here must never fail the grade
+  // response, which has already been computed above.
+  const writeGrammarCache = (newGrammarFocus && newSentenceStructure)
+    ? supabase.rpc('set_sentence_grammar_analysis', {
+        p_table: sourceTable,
+        p_sentence_id: sentence_id,
+        p_grammar_focus: newGrammarFocus,
+        p_sentence_structure: newSentenceStructure,
+      }).then(({ error }: { error: { message: string } | null }) => {
+        if (error) console.error('set_sentence_grammar_analysis error:', error.message)
+      })
+    : Promise.resolve()
+
+  waitUntil(Promise.allSettled([recordAttempts, insertAttempt, writeGrammarCache]))
 
   return NextResponse.json(parsed)
 }
