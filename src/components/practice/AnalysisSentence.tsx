@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { CharTooltip } from './CharTooltip'
 import { CharDetailSheet } from './CharDetailSheet'
+import { useCharPopup } from './useCharPopup'
 import { segmentSentence } from '@/lib/chinese'
 import type { VocabWord, GenerateResponse } from '@/types'
 
@@ -11,14 +12,9 @@ interface Props {
   vocabList: VocabWord[]
 }
 
-interface ActiveSegment {
-  segment: string
-  index: number
-}
-
 export function AnalysisSentence({ sentence, vocabList }: Props) {
-  const [active, setActive]           = useState<ActiveSegment | null>(null)
-  const [showSheet, setShowSheet]     = useState(false)
+  const { activeKey, activeSegment, showSheet, getVocab, getInfo, toggle, close, openSheet } =
+    useCharPopup(vocabList)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   const segments = segmentSentence(sentence.sentence_zh, sentence.vocab_used)
@@ -26,25 +22,8 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
   const isPunctuation = (s: string) =>
     /^[。，？！、；：""''（）【】…—]$/.test(s)
 
-  function getVocabForSegment(seg: string): VocabWord | null {
-    return vocabList.find(w => w.word_zh === seg) ?? null
-  }
-
-  function getInfoForSegment(seg: string) {
-    const vocab = getVocabForSegment(seg)
-    if (vocab) {
-      return {
-        pinyin:  vocab.pinyin,
-        english: vocab.english,
-        hsk:     vocab.hsk_level,
-        pos:     vocab.pos,
-      }
-    }
-    return { pinyin: '', english: '—', hsk: 1 as const, pos: 'other' }
-  }
-
-  const activeInfo  = active ? getInfoForSegment(active.segment) : null
-  const activeVocab = active ? getVocabForSegment(active.segment) : null
+  const activeInfo  = activeSegment ? getInfo(activeSegment) : null
+  const activeVocab = activeSegment ? getVocab(activeSegment) : null
 
   return (
     <>
@@ -63,7 +42,7 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                   color: 'var(--text-tertiary)',
                   alignSelf: 'flex-end',
                   paddingBottom: '2px',
-                  opacity: active ? 0.25 : 0.6,
+                  opacity: activeKey ? 0.25 : 0.6,
                   transition: 'opacity 0.2s',
                 }}
               >
@@ -72,9 +51,10 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
             )
           }
 
-          const info      = getInfoForSegment(seg)
-          const isActive  = active?.index === i
-          const isDimmed  = active !== null && !isActive
+          const info      = getInfo(seg)
+          const key       = String(i)
+          const isActive  = activeKey === key
+          const isDimmed  = activeKey !== null && !isActive
           const isHovered = hoveredIndex === i && !isActive
 
           return (
@@ -90,23 +70,11 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
               }}
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
-              onClick={() => {
-                if (isActive) {
-                  setActive(null)
-                } else {
-                  setActive({ segment: seg, index: i })
-                  setShowSheet(false)
-                }
-              }}
+              onClick={() => toggle(key, seg)}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  if (isActive) {
-                    setActive(null)
-                  } else {
-                    setActive({ segment: seg, index: i })
-                    setShowSheet(false)
-                  }
+                  toggle(key, seg)
                 }
               }}
             >
@@ -166,8 +134,8 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
                   hsk={activeInfo.hsk}
                   pos={activeInfo.pos}
                   vocabWord={activeVocab}
-                  onMore={() => setShowSheet(true)}
-                  onClose={() => setActive(null)}
+                  onMore={openSheet}
+                  onClose={close}
                 />
               )}
             </span>
@@ -175,18 +143,15 @@ export function AnalysisSentence({ sentence, vocabList }: Props) {
         })}
       </div>
 
-      {showSheet && active && activeInfo && (
+      {showSheet && activeSegment && activeInfo && (
         <CharDetailSheet
-          segment={active.segment}
+          segment={activeSegment}
           pinyin={activeInfo.pinyin}
           english={activeInfo.english}
           hsk={activeInfo.hsk}
           pos={activeInfo.pos}
           vocabWord={activeVocab}
-          onClose={() => {
-            setShowSheet(false)
-            setActive(null)
-          }}
+          onClose={close}
         />
       )}
     </>

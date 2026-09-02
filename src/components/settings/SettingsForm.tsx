@@ -34,14 +34,14 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   const supabase = createClient()
 
   const [settings, setSettings] = useState<Partial<Settings>>({
-    starting_hsk: 2, strictness: 2, sentences_per_round: 10,
+    starting_hsk: 1, strictness: 2, sentences_per_round: 10,
     rounds_before_unlock: 3, words_per_unlock: 5,
     show_pinyin: 'tap', show_hints: 'after',
     practice_mode: 'static',
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [theme, setTheme] = useState<ThemeId>('ink-jade')
+  const [theme, setTheme] = useState<ThemeId>(loadSavedTheme)
   const [loaded, setLoaded] = useState(false)
 
   // API key is local-only — persisted to localStorage, never to Supabase.
@@ -76,7 +76,6 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
     loadSettings()
     return () => { cancelled = true }
   }, [supabase])
-  useEffect(() => { setTheme(loadSavedTheme()) }, [])
   useEffect(() => { const stored = getApiKey(); if (stored) setApiKey(stored) }, [])
 
   // Scroll/focus/highlight the API key input when arriving via a redirect

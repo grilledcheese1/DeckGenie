@@ -2,22 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { readLocal, writeLocal } from '@/lib/localCache'
 import type { Progress, Settings } from '@/types'
 
 const PROGRESS_KEY = 'hanzi_progress'
 const SETTINGS_KEY = 'hanzi_settings'
 const UNLOCK_CLAIMED_KEY = 'hanzi_unlock_claimed'
-
-function readLocal<T>(key: string): T | null {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem(key)
-  if (!raw) return null
-  try { return JSON.parse(raw) as T } catch { return null }
-}
-
-function writeLocal(key: string, value: unknown) {
-  if (typeof window !== 'undefined') localStorage.setItem(key, JSON.stringify(value))
-}
+const VOCAB_COUNT_KEY = 'hanzi_vocab_count'
 
 const DEFAULT_PROGRESS: Omit<Progress, 'id' | 'user_id' | 'updated_at'> = {
   rounds_completed: 0,
@@ -39,13 +30,34 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
 
 export function useProgress() {
   const supabase = createClient()
+  // State starts SSR-safe (matches what the server, which has no
+  // localStorage, would render) — hydrating synchronously from cache here
+  // would make the client's first render disagree with the server-rendered
+  // HTML and trigger a hydration-mismatch error. Instead the cache is
+  // applied in the effect below, which only runs after hydration commits,
+  // so it's a normal post-mount update rather than part of hydration.
   const [progress, setProgress] = useState<Progress | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
-  const [vocabCount, setVocabCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [lastClaimedRound, setLastClaimedRound] = useState<number>(() =>
-    readLocal<number>(UNLOCK_CLAIMED_KEY) ?? 0
-  )
+  const [vocabCount, setVocabCount] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [lastClaimedRound, setLastClaimedRound] = useState<number>(0)
+
+  // Hydrate from the previous session's cache immediately after mount — a
+  // returning visit still renders real numbers well before the network
+  // fetch below resolves, just one render tick later than hydration itself
+  // rather than synchronously with it.
+  useEffect(() => {
+    const cachedProgress = readLocal<Progress>(PROGRESS_KEY)
+    const cachedSettings = readLocal<Settings>(SETTINGS_KEY)
+    if (cachedProgress && cachedSettings) {
+      setProgress(cachedProgress)
+      setSettings(cachedSettings)
+      setVocabCount(readLocal<number>(VOCAB_COUNT_KEY) ?? 0)
+      setLoading(false)
+    }
+    const cachedClaimed = readLocal<number>(UNLOCK_CLAIMED_KEY)
+    if (cachedClaimed != null) setLastClaimedRound(cachedClaimed)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +94,7 @@ export function useProgress() {
         }
 
         setVocabCount(count ?? 0)
+        writeLocal(VOCAB_COUNT_KEY, count ?? 0)
         setLoading(false)
         return
       }

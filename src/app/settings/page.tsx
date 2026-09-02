@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SettingsForm } from '@/components/settings/SettingsForm'
+import { AppShell } from '@/components/shell/AppShell'
 
 function SettingsInner() {
   const router = useRouter()
@@ -10,16 +11,27 @@ function SettingsInner() {
   const isFirstRun = searchParams.get('firstRun') === 'true'
   const highlightApiKey = searchParams.get('focus') === 'apikey'
 
-  return (
+  const form = (
     <div className="min-h-screen px-4 py-10 max-w-lg mx-auto">
       <SettingsForm
         mode={isFirstRun ? 'onboarding' : 'edit'}
-        onDone={() => router.push('/dashboard')}
+        onDone={isFirstRun ? () => router.push('/dashboard') : () => router.back()}
         onBack={isFirstRun ? undefined : () => router.back()}
         highlightApiKey={highlightApiKey}
       />
     </div>
   )
+
+  // Onboarding intentionally has no "Back" button so a brand-new user can't
+  // leave without picking their settings (which is what seeds their vocab
+  // in SettingsForm.handleSave). AppShell's sidebar would reintroduce that
+  // escape hatch — 5 nav links plus a sign-out — on a user's very first
+  // authenticated screen, so onboarding renders without it. Non-onboarding
+  // visits (from the sidebar's own Settings link, or a direct URL) keep the
+  // AppShell wrap since /settings is a persistent nav destination there.
+  if (isFirstRun) return form
+
+  return <AppShell>{form}</AppShell>
 }
 
 export default function SettingsPage() {

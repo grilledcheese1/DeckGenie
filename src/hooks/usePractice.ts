@@ -1,8 +1,38 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode, Settings } from '@/types'
+import type { GenerateResponse, GradeResponse, SentenceState, PinyinMode, Settings, SentenceStructureSegment } from '@/types'
 import { getApiKey } from '@/lib/byoKey'
+import { segmentSentence } from '@/lib/chinese'
+
+// Dev-only shortcut: typing this as the answer jumps straight to a graded
+// state without calling /api/grade, so the post-grade UI (Next sentence,
+// Analyze sentence) can be reviewed without spending any API credits.
+const DEV_SKIP_CODE = '8302113'
+
+// Clearly-fake grammarFocus/sentenceStructure so the dev shortcut can also
+// preview the analysis screen's grammar cards without a real /api/grade
+// call. Heuristic, not linguistically rigorous — this is a visual preview
+// aid, not a stand-in for real grading.
+function buildDevAnalysis(sentence: GenerateResponse): Pick<GradeResponse, 'grammarFocus' | 'sentenceStructure'> {
+  const segments = segmentSentence(sentence.sentence_zh, sentence.vocab_used)
+    .filter(seg => /\p{Script=Han}/u.test(seg))
+  const structure: SentenceStructureSegment[] = segments.map((segment, i) => {
+    if (/[吗呢吧]/.test(segment)) return { segment, role: 'Q' }
+    if (i === 0) return { segment, role: 'S' }
+    if (i === segments.length - 1 || i === 1) return { segment, role: 'V' }
+    return { segment, role: 'O' }
+  })
+  return {
+    grammarFocus: {
+      pattern: '(dev preview) — no real grammar analysis was generated',
+      pinyin: '',
+      explanation: 'This is placeholder text from the dev shortcut, not a real grading call.',
+      example: { zh: sentence.sentence_zh, pinyin: sentence.sentence_py, en: '(dev preview)' },
+    },
+    sentenceStructure: structure,
+  }
+}
 
 export function usePractice(strictness: number = 2, practiceMode: Settings['practice_mode'] = 'static') {
   const [state, setState] = useState<SentenceState>({
@@ -55,6 +85,22 @@ export function usePractice(strictness: number = 2, practiceMode: Settings['prac
 
   const submitAnswer = useCallback(async () => {
     if (!state.sentence || !state.userAnswer.trim()) return
+
+    if (process.env.NODE_ENV !== 'production' && state.userAnswer.trim() === DEV_SKIP_CODE) {
+      setState(prev => ({
+        ...prev,
+        status: 'graded',
+        grade: {
+          correct: true,
+          score: 100,
+          feedback: 'Dev shortcut — no grading call was made.',
+          correct_answer: '(dev preview — no real translation graded)',
+          ...buildDevAnalysis(state.sentence!),
+        },
+      }))
+      return
+    }
+
     let apiKey: string | null = null
     if (practiceMode === 'ai') {
       apiKey = getApiKey()

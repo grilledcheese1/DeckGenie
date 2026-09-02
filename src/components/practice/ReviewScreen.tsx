@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import type { WrongAnswer } from '@/types'
+import { WrongAnswerCard } from './WrongAnswerCard'
 
 interface Props {
   wrongAnswers: WrongAnswer[]
@@ -70,73 +71,7 @@ export function ReviewScreen({ wrongAnswers, onDone }: Props) {
       {/* Wrong answer cards */}
       <div className="space-y-4 flex-1">
         {wrongAnswers.map((item, i) => (
-          <div
-            key={i}
-            className="review-item rounded-2xl p-5"
-            style={{ background: 'var(--bg-secondary)', border: '0.5px solid var(--border)' }}
-          >
-            <p
-              className="font-hanzi mb-1"
-              style={{ fontSize: 'clamp(1.4rem, 5vw, 1.8rem)', color: 'var(--text-primary)', lineHeight: 1.3 }}
-            >
-              {item.sentence_zh}
-            </p>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
-              {item.sentence_py}
-            </p>
-
-            <div className="mb-4" style={{ height: '0.5px', background: 'var(--border)' }} />
-
-            <div className="mb-3">
-              <p className="text-xs uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
-                Your answer
-              </p>
-              <p
-                className="text-sm px-3 py-2 rounded-xl"
-                style={{
-                  color: '#f87171',
-                  background: 'rgba(248,113,113,0.08)',
-                  border: '0.5px solid rgba(248,113,113,0.2)',
-                }}
-              >
-                {item.user_answer || '(no answer)'}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
-                Correct answer
-              </p>
-              <p
-                className="text-sm px-3 py-2 rounded-xl"
-                style={{
-                  color: 'var(--accent-text)',
-                  background: 'var(--accent-subtle)',
-                  border: '0.5px solid var(--accent)',
-                }}
-              >
-                {item.correct_answer}
-              </p>
-            </div>
-
-            {item.vocab_used.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {item.vocab_used.map(zh => (
-                  <span
-                    key={zh}
-                    className="text-xs px-2 py-0.5 rounded-lg font-hanzi"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-tertiary)',
-                      border: '0.5px solid var(--border)',
-                    }}
-                  >
-                    {zh}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <WrongAnswerCard key={i} item={item} className="review-item" />
         ))}
       </div>
 
