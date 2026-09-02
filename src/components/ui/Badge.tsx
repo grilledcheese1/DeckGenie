@@ -59,6 +59,13 @@ export function getWordStatus(timesSeen: number, timesCorrect: number): { tone: 
   return { tone: 'status-good', label: 'Good!' }
 }
 
+// Bare color (no pill background) for the same status tags — the analysis
+// table's accuracy % column and status text use plain colored text rather
+// than a badge, but should still track STATUS_STYLES so the two stay in sync.
+export function getStatusColor(status: StatusTag): string {
+  return STATUS_STYLES[status].color as string
+}
+
 function resolveToneStyle(tone: BadgeTone): React.CSSProperties {
   if (tone.startsWith('hsk-')) {
     const level = Number(tone.slice(4)) as HskLevel

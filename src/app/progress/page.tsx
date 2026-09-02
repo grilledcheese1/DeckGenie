@@ -5,12 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useProgress } from '@/hooks/useProgress'
 import { useDailyStatsHistory, HISTORY_DAYS } from '@/hooks/useDailyStatsHistory'
-
-const STAT_ICONS = {
-  rounds: '🔁',
-  streak: '🔥',
-  best: '🏆',
-} as const
+import { RoundsIcon, AccuracyIcon, StreakIcon, TrophyIcon } from '@/components/ui/StatIcons'
 
 /**
  * Surfaces `progress.rolling_accuracy` / `rounds_completed` / `streak_days`
@@ -58,7 +53,7 @@ export default function ProgressPage() {
                   style={{ backgroundColor: 'var(--accent-subtle)' }}
                   aria-hidden="true"
                 >
-                  {STAT_ICONS.rounds}
+                  <RoundsIcon />
                 </div>
                 <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{roundsCompleted}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Rounds completed</p>
@@ -70,7 +65,7 @@ export default function ProgressPage() {
                   style={{ backgroundColor: 'var(--accent-subtle)' }}
                   aria-hidden="true"
                 >
-                  🎯
+                  <AccuracyIcon />
                 </div>
                 <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{rollingAccuracy}%</p>
                 <p className="text-xs mt-2 mb-1" style={{ color: 'var(--text-tertiary)' }}>Rolling accuracy</p>
@@ -83,7 +78,7 @@ export default function ProgressPage() {
                   style={{ backgroundColor: 'var(--accent-subtle)' }}
                   aria-hidden="true"
                 >
-                  {STAT_ICONS.streak}
+                  <StreakIcon />
                 </div>
                 <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
                   {streakDays} day{streakDays === 1 ? '' : 's'}
@@ -97,7 +92,7 @@ export default function ProgressPage() {
                   style={{ backgroundColor: 'var(--accent-subtle)' }}
                   aria-hidden="true"
                 >
-                  {STAT_ICONS.best}
+                  <TrophyIcon />
                 </div>
                 <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
                   {longestStreakDays} day{longestStreakDays === 1 ? '' : 's'}

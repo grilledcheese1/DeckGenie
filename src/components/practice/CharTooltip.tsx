@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react'
 import { gsap } from 'gsap'
 import type { VocabWord } from '@/types'
 import { getToneFromPinyin, TONE_LABELS } from '@/lib/chinese'
@@ -16,19 +16,60 @@ interface Props {
   onClose: () => void
 }
 
+const GAP = 10   // px between the character and the tooltip
+const EDGE = 8   // px of viewport breathing room to keep
+
+/**
+ * Decides whether the tooltip sits above the character (default) or flips
+ * below it. It flips only when the space above the anchor can't fit the
+ * tooltip *and* there's more room below — e.g. the character is a
+ * breakdown chip near the top of the viewport, where an above-placement
+ * tooltip would be clipped off-screen.
+ *
+ * `anchor` is the tooltip's positioned parent (the char span / chip);
+ * `tipHeight` is the rendered tooltip height. Runs on mount and on resize.
+ */
+function resolvePlacement(anchor: HTMLElement, tipHeight: number): 'top' | 'bottom' {
+  const rect = anchor.getBoundingClientRect()
+  const spaceAbove = rect.top - GAP - EDGE
+  const spaceBelow = window.innerHeight - rect.bottom - GAP - EDGE
+  if (spaceAbove < tipHeight && spaceBelow > spaceAbove) return 'bottom'
+  return 'top'
+}
+
 export function CharTooltip({
   segment, pinyin, english, hsk, pos,
   vocabWord, onMore, onClose,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const [placement, setPlacement] = useState<'top' | 'bottom'>('top')
+
+  const measure = useCallback(() => {
+    const el = ref.current
+    const anchor = el?.parentElement
+    if (!el || !anchor) return
+    setPlacement(resolvePlacement(anchor, el.offsetHeight))
+  }, [])
+
+  // Layout effect so the flip is resolved before the browser paints —
+  // no visible jump from an above-placement to a below-placement.
+  useLayoutEffect(() => {
+    measure()
+  }, [measure, segment])
+
+  useEffect(() => {
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [measure])
 
   useEffect(() => {
     if (!ref.current) return
+    const fromY = placement === 'top' ? 6 : -6
     gsap.fromTo(ref.current,
-      { opacity: 0, y: 6, scale: 0.95 },
+      { opacity: 0, y: fromY, scale: 0.95 },
       { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: 'power2.out' }
     )
-  }, [segment])
+  }, [segment, placement])
 
   const tone = getToneFromPinyin(pinyin)
   const accuracy = vocabWord && vocabWord.times_seen > 0
@@ -39,19 +80,35 @@ export function CharTooltip({
     <>
       <div
         className="fixed inset-0 z-30"
-        onClick={onClose}
+        onClick={e => { e.stopPropagation(); onClose() }}
       />
 
       <div
         ref={ref}
         className="absolute z-40 pointer-events-auto"
         style={{
-          bottom: 'calc(100% + 10px)',
+          ...(placement === 'top'
+            ? { bottom: `calc(100% + ${GAP}px)` }
+            : { top: `calc(100% + ${GAP}px)` }),
           left: '50%',
           transform: 'translateX(-50%)',
           width: '160px',
         }}
       >
+        {placement === 'bottom' && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{
+              bottom: '100%',
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderBottom: '5px solid var(--border-hover)',
+            }}
+          />
+        )}
+
         <div
           className="rounded-2xl p-3"
           style={{
@@ -114,17 +171,19 @@ export function CharTooltip({
           </div>
         </div>
 
-        <div
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{
-            top: '100%',
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderTop: '5px solid var(--border-hover)',
-          }}
-        />
+        {placement === 'top' && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{
+              top: '100%',
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: '5px solid var(--border-hover)',
+            }}
+          />
+        )}
       </div>
     </>
   )

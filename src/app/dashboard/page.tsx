@@ -4,62 +4,93 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { gsap } from 'gsap'
 import { useProgress } from '@/hooks/useProgress'
+import { useTodayStats } from '@/hooks/useTodayStats'
 import { useVocabSheet } from '@/hooks/useVocabSheet'
 import { VocabSheet } from '@/components/vocab/VocabSheet'
 import { AppShell } from '@/components/shell/AppShell'
 import { DashboardRightRail } from '@/components/dashboard/DashboardRightRail'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { createClient } from '@/lib/supabase/client'
 import { NeonSign } from '@/components/ui/NeonSign'
 import type { SignMode } from '@/components/ui/NeonSign'
 import { NEON_SIGN_COLOR, neonGlowFor } from '@/lib/neonSignPresets'
 import { THEME_CHANGE_EVENT, themeToSignMode, type ThemeId } from '@/lib/theme'
 import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
+import { RoundsIcon, AccuracyIcon, VocabIcon } from '@/components/ui/StatIcons'
 import type { Settings } from '@/types'
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6] as const
 
 /**
- * A few overlapping low-opacity curved paths suggesting mountains, plus a
- * tiny pagoda silhouette — purely decorative watermark for the round-progress
- * card. Deliberately simple; not the focus of this task.
+ * Dot-and-line stepper across the current unlock cycle's rounds — one dot
+ * per round in `settings.rounds_before_unlock` (NOT sentences_per_round;
+ * this tracks the same "rounds until +N new words" cycle as the caption
+ * below it, and its dot count scales with that setting, not with
+ * sentences-per-round). Filled = round completed, a larger ring = the
+ * current round, small outline = rounds still to come, with a connecting
+ * line whose completed segments match the filled dots.
  */
-function MountainWatermark() {
+function RoundDotTracker({ current, total }: { current: number; total: number }) {
   return (
-    <svg
-      viewBox="0 0 300 140"
-      className="absolute inset-x-0 bottom-0 w-full h-28 pointer-events-none"
-      style={{ opacity: 0.06 }}
-      aria-hidden="true"
-      preserveAspectRatio="xMidYMax slice"
-    >
-      <path d="M0 140 L40 80 L70 110 L110 50 L150 100 L190 60 L230 110 L260 90 L300 140 Z" fill="var(--text-primary)" />
-      <path d="M0 140 L60 100 L100 125 L140 90 L180 130 L220 95 L260 130 L300 110 L300 140 Z" fill="var(--text-primary)" opacity="0.6" />
-      <g transform="translate(215,52)" fill="var(--text-primary)">
-        <rect x="-3" y="32" width="6" height="18" />
-        <polygon points="-15,32 15,32 0,15" />
-        <polygon points="-11.5,17 11.5,17 0,4" />
-        <polygon points="-8,4 8,4 0,-7" />
-        <rect x="-1.5" y="-16" width="3" height="10" />
-      </g>
+    <div className="flex items-center" role="img" aria-label={`Round ${current + 1} of ${total} in this unlock cycle`}>
+      {Array.from({ length: total }).map((_, i) => {
+        const isCompleted = i < current
+        const isCurrent = i === current
+        return (
+          <div key={i} className={`flex items-center ${i < total - 1 ? 'flex-1' : ''}`}>
+            <div
+              className="rounded-full flex-shrink-0 transition-all duration-300"
+              style={
+                isCurrent
+                  ? { width: 20, height: 20, border: '3px solid var(--accent)', backgroundColor: 'transparent' }
+                  : { width: 7, height: 7, backgroundColor: isCompleted ? 'var(--accent)' : 'var(--bg-tertiary)' }
+              }
+            />
+            {i < total - 1 && (
+              <div
+                className="flex-1 h-px mx-1 transition-colors duration-300"
+                style={{ backgroundColor: isCompleted ? 'var(--accent)' : 'var(--bg-tertiary)' }}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Icon roundels for the stat row.
+const STAT_ICONS: Record<'rounds' | 'accuracy' | 'vocab', React.ReactNode> = {
+  rounds: <RoundsIcon />,
+  accuracy: <AccuracyIcon />,
+  vocab: <VocabIcon />,
+}
+
+/** Small sprout accent next to the "Welcome back" heading. */
+function LeafIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 21c8 0 14-6 14-14V5h-2C9 5 5 11 5 19v2Z" />
+      <path d="M5 21c2.5-4 6-7 10.5-9" />
     </svg>
   )
 }
 
-// Icon roundels for the stat row — plain emoji, matching the convention the
-// right-rail cards (StreakCard/DailyGoalCard) already established for this
-// task rather than inventing a new bespoke icon set.
-const STAT_ICONS: Record<'rounds' | 'accuracy' | 'vocab', string> = {
-  rounds: '🔁',
-  accuracy: '🎯',
-  vocab: '📖',
+/** Leading icon for the "View vocab list" row. */
+function ListIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <path d="M3 6h.01M3 12h.01M3 18h.01" />
+    </svg>
+  )
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const { progress, settings, vocabCount, loading, canUnlock, reload } = useProgress()
+  const { roundsDone: roundsToday } = useTodayStats()
   const {
     words, loading: vocabLoading, hasMore, filters,
     open: openVocab, loadMore, applyFilter, removeWord,
@@ -69,6 +100,7 @@ export default function DashboardPage() {
   const [hasDraft, setHasDraft] = useState(false)
   const [hskSaving, setHskSaving] = useState(false)
   const [hskError, setHskError] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
   const [signMode, setSignMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
     const saved = (localStorage.getItem('hanzi-theme') ?? 'ink-jade') as ThemeId
@@ -86,6 +118,19 @@ export default function DashboardPage() {
     }
     window.addEventListener(THEME_CHANGE_EVENT, onThemeChange)
     return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange)
+  }, [])
+
+  // No display-name field exists anywhere in this app's data model yet
+  // (Sidebar's profile chip shows the raw email too) — same
+  // supabase.auth.getUser() fetch Sidebar already does, kept local here
+  // since this page has its own useProgress() instance already.
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    supabase.auth.getUser()
+      .then(({ data }) => { if (!cancelled) setEmail(data.user?.email ?? null) })
+      .catch(() => { if (!cancelled) setEmail(null) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -121,17 +166,6 @@ export default function DashboardPage() {
 
   function handleCloseVocab() {
     setSheetOpen(false)
-  }
-
-  function handleResetDraft() {
-    try { localStorage.removeItem('hanzi_session_draft') } catch {}
-    setHasDraft(false)
-  }
-
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
   }
 
   // Wires the "HSK N ▾" pill to the same settings-update path
@@ -193,10 +227,18 @@ export default function DashboardPage() {
   const currentSentences   = progress?.current_round_sentences ?? 0
   const sentencesPerRound  = settings?.sentences_per_round ?? 10
   const roundsInCycle      = roundsCompleted % roundsBeforeUnlock
+  const currentHsk         = settings?.starting_hsk ?? 1
+
+  // No display-name field exists in this app's data model — best-effort
+  // greeting derived from the email's local part (matching the convention
+  // Sidebar already uses for the profile-chip initial), not a real name.
+  const displayName = email
+    ? email.split('@')[0].split(/[._+]/)[0].replace(/^\w/, c => c.toUpperCase())
+    : 'there'
 
   return (
     <AppShell rightRail={<DashboardRightRail />}>
-      <div ref={containerRef} className="min-h-screen px-4 py-8 max-w-lg mx-auto">
+      <div ref={containerRef} className="min-h-screen px-6 py-8 w-full max-w-3xl">
         {/* Neon signs — dashboard background. Adjust style={{ }} per sign to reposition. */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.13, zIndex: 0 }} aria-hidden="true">
           <NeonSign english="MASTER"    chinese="融会贯通 " color={NEON_SIGN_COLOR} glowColor={neonGlowFor(signMode)} size={4} delay={0}   mode={signMode} className="absolute" style={{ left: '-28%',  top: '8%' }} />
@@ -209,104 +251,96 @@ export default function DashboardPage() {
         </div>
         <div className="relative" style={{ zIndex: 1 }}>
 
-        {/* Vocab count + HSK level control */}
-        <div className="dash-card flex items-start justify-between mb-8">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {vocabCount} words active
-          </p>
+        {/* Welcome heading + HSK level control */}
+        <div className="dash-card mb-8">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <LeafIcon />
+              Welcome back, {displayName}
+            </h1>
 
-          <div className="flex flex-col items-end gap-1">
-            <div className="relative inline-flex items-center">
-              <select
-                value={settings?.starting_hsk ?? 1}
-                onChange={handleHskChange}
-                disabled={hskSaving}
-                aria-label="Starting HSK level"
-                className="appearance-none rounded-full pl-3 pr-7 py-1.5 text-xs font-medium transition-all hover-border disabled:opacity-60 cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {HSK_LEVELS.map(level => (
-                  <option key={level} value={level}>HSK {level}</option>
-                ))}
-              </select>
-              <svg
-                width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                className="absolute right-2.5 pointer-events-none"
-                style={{ color: 'var(--text-tertiary)' }}
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <div className="relative inline-flex items-center">
+                <select
+                  value={settings?.starting_hsk ?? 1}
+                  onChange={handleHskChange}
+                  disabled={hskSaving}
+                  aria-label="Starting HSK level"
+                  className="appearance-none rounded-full pl-3 pr-7 py-1.5 text-xs font-medium transition-all hover-border disabled:opacity-60 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {HSK_LEVELS.map(level => (
+                    <option key={level} value={level}>HSK {level}</option>
+                  ))}
+                </select>
+                <svg
+                  width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className="absolute right-2.5 pointer-events-none"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+              {hskError && (
+                <p className="text-xs" style={{ color: 'var(--error-text)' }} role="alert">
+                  {hskError}
+                </p>
+              )}
             </div>
-            {hskError && (
-              <p className="text-xs" style={{ color: 'var(--error-text)' }} role="alert">
-                {hskError}
-              </p>
-            )}
           </div>
+
+          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+            HSK {currentHsk} · {vocabCount} words active
+          </p>
         </div>
 
         {/* Stats row */}
-        <div className="dash-card grid grid-cols-3 gap-3 mb-6">
+        <div className="dash-card grid grid-cols-3 gap-4 mb-6">
           {[
-            { key: 'rounds' as const,   label: 'Rounds',   value: roundsCompleted },
-            { key: 'accuracy' as const, label: 'Accuracy', value: `${progress?.rolling_accuracy ?? 0}%` },
-            { key: 'vocab' as const,    label: 'Vocab',     value: vocabCount },
-          ].map(({ key, label, value }) => (
-            <Card key={key} padding="md">
+            { key: 'rounds' as const,   label: 'Rounds',   subLabel: 'Today',   value: roundsToday },
+            { key: 'accuracy' as const, label: 'Accuracy', subLabel: 'Overall', value: `${progress?.rolling_accuracy ?? 0}%` },
+            { key: 'vocab' as const,    label: 'Words',    subLabel: 'Active',  value: vocabCount },
+          ].map(({ key, label, subLabel, value }) => (
+            <Card key={key} padding="lg" className="flex items-center gap-3">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm mb-2"
+                className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: 'var(--accent-subtle)' }}
                 aria-hidden="true"
               >
                 {STAT_ICONS[key]}
               </div>
-              <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{value}</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</p>
+              <div>
+                <p className="text-3xl font-medium" style={{ color: 'var(--text-primary)' }}>{value}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{label}</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)', opacity: 0.7 }}>{subLabel}</p>
+              </div>
             </Card>
           ))}
         </div>
 
         {/* Round cycle progress */}
-        <Card padding="lg" className="dash-card relative overflow-hidden mb-4">
-          <MountainWatermark />
-          <div className="relative" style={{ zIndex: 1 }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Round {currentRound}</p>
+        <Card padding="xl" className="dash-card mb-4" style={{ minHeight: '220px' }}>
+          <div className="flex flex-col h-full" style={{ minHeight: '164px' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-base" style={{ color: 'var(--text-secondary)' }}>Round {currentRound}</p>
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 {currentSentences} / {sentencesPerRound} sentences
               </p>
             </div>
 
-            <ProgressBar
-              value={currentSentences}
-              max={sentencesPerRound}
-              className="mb-4"
-              aria-label="Sentences completed this round"
-            />
-
-            {/* Round cycle pip-stepper */}
-            <div className="flex items-center gap-2">
-              {Array.from({ length: roundsBeforeUnlock }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-1.5 flex-1 rounded-full transition-all duration-300"
-                  style={{
-                    backgroundColor:
-                      i < roundsInCycle
-                        ? 'var(--accent)'
-                        : i === roundsInCycle && currentSentences > 0
-                        ? 'var(--accent-subtle)'
-                        : 'var(--bg-tertiary)',
-                  }}
-                />
-              ))}
+            {/* Vertically centered in the remaining space, left-aligned —
+                matches the reference layout instead of sitting right under
+                the header. */}
+            <div className="flex-1 flex items-center">
+              <RoundDotTracker current={roundsInCycle} total={roundsBeforeUnlock} />
             </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {roundsBeforeUnlock - roundsInCycle} round{roundsBeforeUnlock - roundsInCycle !== 1 ? 's' : ''} until +{settings?.words_per_unlock ?? 5} new words
             </p>
           </div>
@@ -333,27 +367,22 @@ export default function DashboardPage() {
 
         {/* Action buttons */}
         <div className="dash-card space-y-3 mt-2">
-          {hasDraft ? (
-            <div className="flex gap-3">
-              <Button variant="secondary" size="lg" className="flex-1" onClick={handleResetDraft}>
-                Reset session
-              </Button>
-              <Button variant="primary" size="lg" icon="ink" className="flex-1" onClick={() => router.push('/practice')}>
-                Continue practice
-              </Button>
-            </div>
-          ) : (
-            <Button variant="primary" size="lg" icon="ink" className="w-full" onClick={() => router.push('/practice')}>
-              {currentSentences > 0 ? 'Continue practice' : 'Start practice'}
-            </Button>
-          )}
-
-          <Button variant="secondary" size="lg" className="w-full" onClick={handleOpenVocab}>
-            View vocab list
+          <Button
+            variant="primary" size="xl" icon="ink" trailingIcon="right"
+            subtitle={hasDraft || currentSentences > 0 ? `Round ${currentRound}` : `Begin Round ${currentRound}`}
+            className="w-full"
+            onClick={() => router.push('/practice')}
+          >
+            {hasDraft || currentSentences > 0 ? 'Continue practice' : 'Start practice'}
           </Button>
 
-          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={handleSignOut}>
-            Sign out
+          {/* Points down (not the ordinary right-chevron) — this opens
+              VocabSheet, a bottom sheet, not a side panel or new page. */}
+          <Button
+            variant="secondary" size="lg" leadingIcon={<ListIcon />} trailingIcon="down"
+            className="w-full" onClick={handleOpenVocab}
+          >
+            View vocab list
           </Button>
         </div>
 

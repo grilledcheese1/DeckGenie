@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { readLocal, writeLocal } from '@/lib/localCache'
 import type { VocabWord } from '@/types'
 
 const RECENT_LIMIT = 3
+const RECENT_VOCAB_KEY = 'hanzi_recent_vocab'
 
 /**
  * The 3 most-recently-unlocked vocab words for `RecentVocabCard`. A small
@@ -14,6 +16,16 @@ const RECENT_LIMIT = 3
  * (filters/pagination/`open()`) is owned by the vocab sheet flow and would
  * be the wrong shape for this glanceable card.
  *
+ * Hydrates from the previous session's cached words in an effect right
+ * after mount — not synchronously in `useState`, which would make the
+ * client's first render disagree with the server's cache-less render and
+ * trigger a hydration-mismatch error — so a returning visit still renders
+ * the list well before the network fetch below resolves, just one render
+ * tick after hydration rather than synchronously with it. Same
+ * session-persistence pattern as `useProgress`/`useTodayStats`/
+ * `useWeeklyActivity`. Still refetches in the background and overwrites the
+ * cache either way.
+ *
  * Follows `useTodayStats`'s conventions: cancelled-guard, surfaced `error`,
  * no silent failures.
  */
@@ -21,6 +33,14 @@ export function useRecentVocab() {
   const [words, setWords] = useState<VocabWord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cached = readLocal<VocabWord[]>(RECENT_VOCAB_KEY)
+    if (cached) {
+      setWords(cached)
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -54,9 +74,11 @@ export function useRecentVocab() {
           return
         }
 
-        setWords(data ?? [])
+        const next = data ?? []
+        setWords(next)
         setError(null)
         setLoading(false)
+        writeLocal(RECENT_VOCAB_KEY, next)
       } catch (e) {
         if (ignore) return
         const message = e instanceof Error ? e.message : 'Unknown error'

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { gsap } from 'gsap'
 import { usePractice } from '@/hooks/usePractice'
 import { useProgress } from '@/hooks/useProgress'
-import { SentenceCard } from '@/components/practice/SentenceCard'
+import { SentenceCard, SpeakerButton } from '@/components/practice/SentenceCard'
 import { UnlockModal } from '@/components/practice/UnlockModal'
 import { AnalysisSentence } from '@/components/practice/AnalysisSentence'
 import { AppShell } from '@/components/shell/AppShell'
@@ -16,7 +16,7 @@ import { SentenceBreakdownCard } from '@/components/practice/SentenceBreakdownCa
 import { GrammarFocusCard } from '@/components/practice/GrammarFocusCard'
 import { TipsCard } from '@/components/practice/TipsCard'
 import { ScoreRing } from '@/components/practice/ScoreRing'
-import { Badge, getWordStatus } from '@/components/ui/Badge'
+import { Badge, getWordStatus, getStatusColor, type StatusTag } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { getApiKey } from '@/lib/byoKey'
 import { loadSavedTheme, applyTheme, THEMES, type ThemeId } from '@/lib/theme'
@@ -284,6 +284,23 @@ function PracticeInner() {
     )
   }
 
+  // Swaps the current sentence for a new one without grading it — no
+  // round-progress increment, no streak/accuracy change, since the user
+  // never submitted an answer for it.
+  async function handleSkip() {
+    if (!cardWrapRef.current) {
+      await fetchSentence()
+      return
+    }
+    await gsap.to(cardWrapRef.current, { opacity: 0, x: -32, duration: 0.25, ease: 'power2.in' })
+    gsap.set(cardWrapRef.current, { opacity: 1, x: 0 })
+    await fetchSentence()
+    gsap.fromTo(cardWrapRef.current,
+      { opacity: 0, x: 32 },
+      { opacity: 1, x: 0, duration: 0.3, ease: 'power2.out' }
+    )
+  }
+
   function handleUnlockComplete(words: CorpusWord[]) {
     claimUnlock()
     clearDraft()
@@ -315,6 +332,20 @@ function PracticeInner() {
     setAnalysisMode(false)
   }
 
+  // Mirrors SentenceCard's "↵ Enter to submit" affordance — analysis mode
+  // has no text input to steal focus, so a bare Enter always advances.
+  useEffect(() => {
+    if (!analysisMode) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Enter') {
+        exitAnalysis()
+        handleNext()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [analysisMode]) // eslint-disable-line
+
   function cycleTheme() {
     const ids = THEMES.map(t => t.id) as ThemeId[]
     const next = ids[(ids.indexOf(theme) + 1) % ids.length]
@@ -339,6 +370,13 @@ function PracticeInner() {
     return { label: 'Hard', color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.3)' }
   }
 
+  function getGradeMessage(score: number): { title: string; description: string; encouragement: string } {
+    if (score >= 90) return { title: 'Excellent!', description: 'You nailed the translation.', encouragement: 'Keep it up!' }
+    if (score >= 70) return { title: 'Great job!', description: 'You understood most of the sentence.', encouragement: 'Keep going!' }
+    if (score >= 40) return { title: 'Getting there', description: 'You caught some of the meaning.', encouragement: 'Review the words below.' }
+    return { title: 'Keep practicing', description: 'This one was tricky.', encouragement: 'Check the correct answer below.' }
+  }
+
   const activeVocabZh: string[] = []
 
   // ── Analysis mode — full-screen takeover ───────────────────────────
@@ -354,7 +392,7 @@ function PracticeInner() {
           />
         }
       >
-        <div className="flex flex-col min-h-screen px-4 py-8 max-w-lg mx-auto">
+        <div className="flex flex-col min-h-screen px-4 py-8 xl:py-10 max-w-lg xl:max-w-4xl mx-auto">
 
           {/* Top nav */}
           <div className="flex items-center justify-between mb-8">
@@ -374,28 +412,62 @@ function PracticeInner() {
             </button>
           </div>
 
-          {/* Score ring */}
-          {state.grade && (
-            <div className="flex flex-col items-center gap-2 mb-6">
-              <ScoreRing score={state.grade.score} size={72} />
+          {/* Score ring + grade message */}
+          {state.grade && (() => {
+            const msg = getGradeMessage(state.grade.score)
+            return (
+              <div className="flex items-center gap-4 mb-8">
+                <ScoreRing score={state.grade.score} size={72} />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--accent-text)' }}>
+                    {msg.title}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    {msg.description}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    {msg.encouragement}
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Annotated sentence + speaker/turtle column — mt-10 keeps the
+              tap-to-inspect tooltip clear of the viewport top. Sentence is
+              left-aligned; pr-24 just clears the absolutely positioned
+              speaker column on the right. */}
+          <div className="relative mt-10 mb-2">
+            <div className="pr-24">
+              <AnalysisSentence
+                sentence={state.sentence}
+                vocabList={vocabList}
+              />
+              {state.grade?.correct_answer && (
+                <p className="text-sm mt-3" style={{ color: 'var(--accent-text)' }}>
+                  {state.grade.correct_answer}
+                </p>
+              )}
             </div>
-          )}
-
-          <p className="text-xs mb-4 text-center" style={{ color: 'var(--text-tertiary)' }}>
-            Tap any character to inspect
-          </p>
-
-          {/* Annotated sentence — mt-16 keeps tooltip above the viewport top */}
-          <div className="mt-16 mb-8">
-            <AnalysisSentence
-              sentence={state.sentence}
-              vocabList={vocabList}
-            />
+            <div className="absolute right-0 top-0">
+              <SpeakerButton text={state.sentence.sentence_zh} />
+            </div>
           </div>
 
-          {/* Words in this sentence */}
+          {/* Dotted divider */}
+          <div className="flex items-center gap-2 my-6" aria-hidden="true">
+            <div className="flex-1 border-t border-dashed" style={{ borderColor: 'var(--border)' }} />
+            <span className="w-1.5 h-1.5 rotate-45 flex-shrink-0" style={{ background: 'var(--accent)' }} />
+            <div className="flex-1 border-t border-dashed" style={{ borderColor: 'var(--border)' }} />
+          </div>
+
+          {/* Words in this sentence — a grid at xl+ (fixed column widths
+              shared by every row) so the percentage/POS/status columns line
+              up vertically down the list: same x position, different y.
+              Below xl it falls back to a simple flex row (narrower
+              viewports don't have room for rigid columns). */}
           <div
-            className="rounded-2xl p-4 mb-4"
+            className="rounded-2xl p-4 xl:p-6 mb-4"
             style={{ background: 'var(--bg-secondary)', border: '0.5px solid var(--border)' }}
           >
             <p
@@ -404,15 +476,21 @@ function PracticeInner() {
             >
               Words in this sentence
             </p>
-            <div className="space-y-2">
+            <div className="divide-y divide-[color:var(--border)]">
               {state.sentence.vocab_used.map(zh => {
                 const word = vocabList.find(w => w.word_zh === zh)
                 if (!word) return null
                 const status = getWordStatus(word.times_seen, word.times_correct)
+                const statusKey = status.tone.slice('status-'.length) as StatusTag
+                const statusColor = getStatusColor(statusKey)
+                const pct = word.times_seen > 0 ? `${Math.round((word.times_correct / word.times_seen) * 100)}%` : '—%'
                 return (
-                  <div key={zh} className="flex items-center justify-between gap-2">
+                  <div
+                    key={zh}
+                    className="flex items-center justify-between gap-2 py-2.5 xl:grid xl:grid-cols-[minmax(0,1fr)_56px_100px_170px] xl:gap-4"
+                  >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-hanzi text-lg flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-hanzi text-lg xl:text-xl flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
                         {word.word_zh}
                       </span>
                       <div className="min-w-0">
@@ -424,9 +502,18 @@ function PracticeInner() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Badge tone={status.tone}>{status.label}</Badge>
+                    <div className="flex items-center gap-3 flex-shrink-0 xl:contents">
+                      <span className="text-xs tabular-nums xl:text-right" style={{ color: statusColor }}>{pct}</span>
                       <Badge tone={`pos-${word.pos}`}>{word.pos}</Badge>
+                      <span className="text-xs font-medium whitespace-nowrap inline-flex items-center gap-1" style={{ color: statusColor }}>
+                        {statusKey === 'good' && '✓'}
+                        {statusKey === 'review' && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                          </svg>
+                        )}
+                        {status.label}
+                      </span>
                     </div>
                   </div>
                 )
@@ -443,19 +530,24 @@ function PracticeInner() {
               here (rather than a single responsive component) mirrors
               RightRail's own hidden/flex split, just inverted. */}
           <div className="xl:hidden space-y-4 mb-4">
-            <SentenceBreakdownCard segments={state.grade?.sentenceStructure} />
+            <SentenceBreakdownCard segments={state.grade?.sentenceStructure} vocabList={vocabList} />
             <GrammarFocusCard grammarFocus={state.grade?.grammarFocus} />
             <TipsCard sentence={state.sentence} vocabList={vocabList} grammarFocus={state.grade?.grammarFocus} />
           </div>
 
           {/* Next sentence */}
-          <button
-            onClick={() => { exitAnalysis(); handleNext() }}
-            className="w-full rounded-2xl py-4 text-sm font-medium transition-all active:scale-[0.98] mt-auto hover-accent"
-            style={{ background: 'var(--accent)', color: 'white', border: 'none' }}
-          >
-            Next sentence →
-          </button>
+          <div className="mt-auto">
+            <button
+              onClick={() => { exitAnalysis(); handleNext() }}
+              className="w-full rounded-2xl py-4 text-sm font-medium transition-all active:scale-[0.98] hover-accent"
+              style={{ background: 'var(--accent)', color: 'white', border: 'none' }}
+            >
+              Next sentence →
+            </button>
+            <p className="text-xs text-center mt-3" style={{ color: 'var(--text-tertiary)' }}>
+              Press Enter
+            </p>
+          </div>
 
         </div>
       </AppShell>
@@ -465,18 +557,22 @@ function PracticeInner() {
   // ── Normal practice mode ───────────────────────────────────────────
   return (
     <AppShell rightRail={<PracticeRightRail />}>
-      <div className="min-h-screen flex flex-col px-4 py-8 max-w-lg mx-auto">
+      <div className="min-h-screen flex flex-col px-4 py-8 xl:py-10 max-w-lg xl:max-w-4xl mx-auto">
 
-        {/* Top nav */}
-        <div className="flex items-center justify-between mb-8">
+        {/* Top nav — 3-column grid so the words/mode pill group is truly
+            centered regardless of the left/right groups' widths (a plain
+            flex justify-between wouldn't center it against unequal
+            siblings). */}
+        <div className="grid grid-cols-3 items-center mb-8">
           <button
             onClick={() => router.push('/dashboard')}
-            className="text-sm flex items-center gap-1.5 transition-colors"
+            className="justify-self-start text-sm flex items-center gap-1.5 transition-colors"
             style={{ color: 'var(--text-tertiary)' }}
           >
-            ← Dashboard
+            ← Back to Dashboard
           </button>
-          <div className="flex items-center gap-2">
+
+          <div className="justify-self-center flex items-center gap-2">
             <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {vocabCount} words
             </span>
@@ -491,7 +587,9 @@ function PracticeInner() {
             >
               {settings?.practice_mode === 'ai' ? 'AI mode' : 'Free mode'}
             </span>
+          </div>
 
+          <div className="justify-self-end flex items-center gap-2">
             <StreakFlame streak={currentStreak} />
 
             <Link
@@ -612,6 +710,7 @@ function PracticeInner() {
               userAnswer={state.userAnswer}
               onAnswerChange={setAnswer}
               onSubmit={submitAnswer}
+              onSkip={handleSkip}
               grade={state.grade}
               status={state.status}
               showHints={settings?.show_hints ?? 'after'}

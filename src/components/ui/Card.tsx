@@ -1,4 +1,4 @@
-export type CardPadding = 'sm' | 'md' | 'lg'
+export type CardPadding = 'sm' | 'md' | 'lg' | 'xl'
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: CardPadding
@@ -8,6 +8,7 @@ const PADDING_CLASSES: Record<CardPadding, string> = {
   sm: 'p-3',
   md: 'p-4',
   lg: 'p-5',
+  xl: 'p-8',
 }
 
 /**

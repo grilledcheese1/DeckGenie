@@ -34,12 +34,9 @@ export function StreakCard() {
 
   return (
     <Card padding="md">
-      <div className="flex items-center gap-2 mb-1">
-        <span aria-hidden="true" className="text-lg">🔥</span>
-        <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-          {streak} day{streak === 1 ? '' : 's'} streak
-        </h3>
-      </div>
+      <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+        {streak} day{streak === 1 ? '' : 's'} streak
+      </h3>
       <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
         {progress?.longest_streak_days ? `Best: ${progress.longest_streak_days} days` : 'Keep it going'}
       </p>

@@ -24,21 +24,13 @@ export function GrammarFocusCard({ grammarFocus }: Props) {
         </p>
       ) : (
         <div className="space-y-3">
-          <div>
-            <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>
-              {grammarFocus.pattern}
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--accent-text)' }}>
-              {grammarFocus.pinyin}
-            </p>
-          </div>
+          <p className="text-sm font-medium leading-snug" style={{ color: 'var(--accent-text)' }}>
+            {grammarFocus.pattern}
+          </p>
           <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             {grammarFocus.explanation}
           </p>
-          <div
-            className="rounded-xl px-3 py-2.5"
-            style={{ background: 'var(--bg-tertiary)', border: '0.5px solid var(--border)' }}
-          >
+          <div>
             <p className="font-hanzi text-base mb-0.5" style={{ color: 'var(--text-primary)' }}>
               {grammarFocus.example.zh}
             </p>

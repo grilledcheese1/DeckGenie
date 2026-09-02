@@ -6,9 +6,9 @@ import { useProgress } from '@/hooks/useProgress'
 import { useTodayStats } from '@/hooks/useTodayStats'
 
 /**
- * Droplet icon + `ProgressBar` toward today's goal. Goal =
- * `settings.sentences_per_round`, actual = today's `sentences_done` — reuses
- * `useTodayStats` as-is (already built in a prior task, don't rebuild it).
+ * `ProgressBar` toward today's goal. Goal = `settings.sentences_per_round`,
+ * actual = today's `sentences_done` — reuses `useTodayStats` as-is (already
+ * built in a prior task, don't rebuild it).
  */
 export function DailyGoalCard() {
   const { settings } = useProgress()
@@ -24,10 +24,7 @@ export function DailyGoalCard() {
   return (
     <Card padding="md">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="text-base">💧</span>
-          <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Daily goal</h3>
-        </div>
+        <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Daily goal</h3>
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {display} / {goal}
         </p>

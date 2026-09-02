@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Noto_Serif_SC, DM_Sans } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${dmSans.variable} ${notoSerifSC.variable}`} suppressHydrationWarning>
       <body className="antialiased min-h-screen">
-        <script
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem('hanzi-theme')||'ink-jade';document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
           }}

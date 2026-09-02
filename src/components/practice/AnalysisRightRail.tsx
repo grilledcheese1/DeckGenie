@@ -18,7 +18,7 @@ interface Props {
 export function AnalysisRightRail({ sentence, vocabList, grammarFocus, sentenceStructure }: Props) {
   return (
     <>
-      <SentenceBreakdownCard segments={sentenceStructure} />
+      <SentenceBreakdownCard segments={sentenceStructure} vocabList={vocabList} />
       <GrammarFocusCard grammarFocus={grammarFocus} />
       <TipsCard sentence={sentence} vocabList={vocabList} grammarFocus={grammarFocus} />
     </>
