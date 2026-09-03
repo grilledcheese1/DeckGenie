@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProgress } from '@/hooks/useProgress'
+import { useUserEmail, clearCachedEmail } from '@/hooks/useUserEmail'
 import { createClient } from '@/lib/supabase/client'
 import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
 import { LayoutGroup } from 'motion/react'
@@ -20,25 +21,12 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { settings, reload } = useProgress()
+  const email = useUserEmail()
 
-  const [email, setEmail] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const chipRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const firstMenuItemRef = useRef<HTMLAnchorElement>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const supabase = createClient()
-    supabase.auth.getUser()
-      .then(({ data }) => {
-        if (!cancelled) setEmail(data.user?.email ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setEmail(null)
-      })
-    return () => { cancelled = true }
-  }, [])
 
   // Sidebar holds its own independent `useProgress()` instance, separate
   // from the dashboard page's — without this, changing the HSK level via
@@ -92,6 +80,7 @@ export function Sidebar() {
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    clearCachedEmail()
     router.push('/login')
   }
 

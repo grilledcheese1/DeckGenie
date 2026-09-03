@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { gsap } from 'gsap'
 import { useProgress } from '@/hooks/useProgress'
 import { useTodayStats } from '@/hooks/useTodayStats'
+import { useUserEmail } from '@/hooks/useUserEmail'
 import { useVocabSheet } from '@/hooks/useVocabSheet'
 import { VocabSheet } from '@/components/vocab/VocabSheet'
 import { AppShell } from '@/components/shell/AppShell'
@@ -100,7 +101,7 @@ export default function DashboardPage() {
   const [hasDraft, setHasDraft] = useState(false)
   const [hskSaving, setHskSaving] = useState(false)
   const [hskError, setHskError] = useState<string | null>(null)
-  const [email, setEmail] = useState<string | null>(null)
+  const email = useUserEmail()
   const [signMode, setSignMode] = useState<SignMode>(() => {
     if (typeof window === 'undefined') return 'neon'
     const saved = (localStorage.getItem('hanzi-theme') ?? 'ink-jade') as ThemeId
@@ -118,19 +119,6 @@ export default function DashboardPage() {
     }
     window.addEventListener(THEME_CHANGE_EVENT, onThemeChange)
     return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange)
-  }, [])
-
-  // No display-name field exists anywhere in this app's data model yet
-  // (Sidebar's profile chip shows the raw email too) — same
-  // supabase.auth.getUser() fetch Sidebar already does, kept local here
-  // since this page has its own useProgress() instance already.
-  useEffect(() => {
-    let cancelled = false
-    const supabase = createClient()
-    supabase.auth.getUser()
-      .then(({ data }) => { if (!cancelled) setEmail(data.user?.email ?? null) })
-      .catch(() => { if (!cancelled) setEmail(null) })
-    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
