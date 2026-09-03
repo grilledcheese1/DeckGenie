@@ -1,10 +1,16 @@
 import { QuoteCard } from '@/components/dashboard/QuoteCard'
+import { NeonSignDrift } from './NeonSignDrift'
 
 /**
- * Normal practice mode's right rail. Kept deliberately lightweight — a
- * single idiom-of-the-day card (the same static `QUOTES` deck / component
- * the dashboard already uses), rather than duplicating that pattern.
+ * Normal practice mode's right rail: the idiom-of-the-day card (same
+ * static `QUOTES` deck the dashboard uses), plus a bounded panel of
+ * slowly drifting, grab-and-fling neon signs filling the space beneath it.
  */
 export function PracticeRightRail() {
-  return <QuoteCard />
+  return (
+    <>
+      <QuoteCard />
+      <NeonSignDrift />
+    </>
+  )
 }

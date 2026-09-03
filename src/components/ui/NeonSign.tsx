@@ -15,17 +15,20 @@ interface NeonSignProps {
   fadeInDuration?: number
   className?:      string
   style?:          React.CSSProperties
+  /** Render a static idiom (Chinese only, no typewriter type/erase cycle). */
+  static?:         boolean
 }
 
 export function NeonSign({
   english, chinese, color,
   delay = 0, size = 1, mode = 'neon', fadeInDuration = 1.5, glowColor = '', className = '', style = {},
+  static: isStatic = false,
 }: NeonSignProps) {
   const isNeon = mode === 'neon'
   const effectiveGlowColor = glowColor || color
 
   const { borderRef, displayText, isEnglish, phase, glowOn } = useTypewriterCycle({
-    english, chinese, delay, mode, effectiveGlowColor,
+    english, chinese, delay, mode, effectiveGlowColor, staticMode: isStatic,
   })
 
   const S = mode === 'vermillion' ? {

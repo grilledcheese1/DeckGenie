@@ -27,6 +27,13 @@ interface UseTypewriterCycleOptions {
    * sign `color`) used for the GSAP box-shadow pulse below.
    */
   effectiveGlowColor: string
+  /**
+   * When true: no typewriter cycle. Renders `chinese` permanently (no
+   * cursor, no type/erase), and skips the GSAP box-shadow pulse — the
+   * sign's own inline `boxShadow` already carries the resting neon glow.
+   * `glowOn` still fades in `delay` seconds after mount.
+   */
+  staticMode?: boolean
 }
 
 interface UseTypewriterCycleResult {
@@ -48,7 +55,7 @@ interface UseTypewriterCycleResult {
  * flex-row characters), which stays in each component.
  */
 export function useTypewriterCycle({
-  english, chinese, delay = 0, mode, effectiveGlowColor,
+  english, chinese, delay = 0, mode, effectiveGlowColor, staticMode = false,
 }: UseTypewriterCycleOptions): UseTypewriterCycleResult {
   const borderRef                     = useRef<HTMLDivElement>(null)
   const [displayText, setDisplayText] = useState('')
@@ -121,6 +128,12 @@ export function useTypewriterCycle({
   runCycleRef.current = runCycle
 
   useEffect(() => {
+    // Static: no typewriter cycle — just fade the glow in after `delay`.
+    if (staticMode) {
+      const t = setTimeout(() => setGlowOn(true), delay * 1000)
+      return () => clearTimeout(t)
+    }
+
     const warmup = setTimeout(() => {
       setGlowOn(true)
       setPhase('warmup')
@@ -131,10 +144,12 @@ export function useTypewriterCycle({
       clearTimeout(warmup)
       clearAll()
     }
-  }, [delay, runCycle])
+  }, [delay, runCycle, staticMode])
 
   useEffect(() => {
-    if (!borderRef.current) return
+    // Static signs rely on the component's inline resting `boxShadow`; the
+    // GSAP hold-phase pulse only exists for the typewriter cycle.
+    if (staticMode || !borderRef.current) return
     gsap.killTweensOf(borderRef.current, 'boxShadow')
     if (mode !== 'neon') {
       gsap.set(borderRef.current, { boxShadow: 'none' })
@@ -152,7 +167,11 @@ export function useTypewriterCycle({
         duration: 0.4,
       })
     }
-  }, [phase, effectiveGlowColor, mode])
+  }, [phase, effectiveGlowColor, mode, staticMode])
+
+  if (staticMode) {
+    return { borderRef, displayText: chinese, isEnglish: false, phase: 'hold-zh', glowOn }
+  }
 
   return { borderRef, displayText, isEnglish, phase, glowOn }
 }
