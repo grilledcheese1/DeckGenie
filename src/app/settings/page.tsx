@@ -12,11 +12,10 @@ function SettingsInner() {
   const highlightApiKey = searchParams.get('focus') === 'apikey'
 
   const form = (
-    <div className="min-h-screen px-4 py-10 max-w-lg mx-auto">
+    <div className="min-h-screen px-4 py-8 sm:px-8 sm:py-12 max-w-3xl mx-auto">
       <SettingsForm
         mode={isFirstRun ? 'onboarding' : 'edit'}
         onDone={isFirstRun ? () => router.push('/dashboard') : () => router.back()}
-        onBack={isFirstRun ? undefined : () => router.back()}
         highlightApiKey={highlightApiKey}
       />
     </div>

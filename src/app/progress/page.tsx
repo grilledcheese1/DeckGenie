@@ -1,172 +1,155 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { AppShell } from '@/components/shell/AppShell'
-import { Card } from '@/components/ui/Card'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useProgress } from '@/hooks/useProgress'
-import { useDailyStatsHistory, HISTORY_DAYS } from '@/hooks/useDailyStatsHistory'
-import { RoundsIcon, AccuracyIcon, StreakIcon, TrophyIcon } from '@/components/ui/StatIcons'
+import { useDailyStatsHistory } from '@/hooks/useDailyStatsHistory'
+import { useRecentSessions } from '@/hooks/useRecentSessions'
+import { liveStreak } from '@/lib/streak'
+import { RoundsIcon, StreakIcon, TrophyIcon } from '@/components/ui/StatIcons'
+import { CalendarIcon, ChevronDownIcon } from '@/components/progress/progressIcons'
+import { ProgressStatCard } from '@/components/progress/ProgressStatCard'
+import { PracticeActivityChart, type ActivityPoint } from '@/components/progress/PracticeActivityChart'
+import { LearningCalendar } from '@/components/progress/LearningCalendar'
+import { RecentSessionsCard } from '@/components/progress/RecentSessionsCard'
+import { QuoteCard } from '@/components/dashboard/QuoteCard'
+
+const RANGES = [
+  { days: 7,  label: 'Last 7 days' },
+  { days: 14, label: 'Last 14 days' },
+  { days: 30, label: 'Last 30 days' },
+]
 
 /**
- * Surfaces `progress.rolling_accuracy` / `rounds_completed` / `streak_days`
- * / `longest_streak_days` — all already fetched by `useProgress()` — plus a
- * simple per-day history view built from `daily_stats` rows (via the new
- * `useDailyStatsHistory` hook) as hand-rolled CSS bars. No charting
- * library — the data (one number per day, 14 days) is simple enough that
- * plain `height: ${pct}%` divs are the right call.
+ * The `/progress` dashboard: headline stats from `useProgress()`, a
+ * hand-rolled SVG activity chart + contribution calendar from
+ * `daily_stats` (`useDailyStatsHistory`), a recent-attempts feed
+ * (`useRecentSessions`), and the idiom-of-the-day card. No charting
+ * library — the shapes here are simple enough to draw directly.
  */
 export default function ProgressPage() {
-  const { progress, loading } = useProgress()
-  const { days, loading: historyLoading, error: historyError } = useDailyStatsHistory()
+  const [rangeDays, setRangeDays] = useState(14)
 
-  const roundsCompleted    = progress?.rounds_completed ?? 0
-  const rollingAccuracy    = progress?.rolling_accuracy ?? 0
-  const streakDays         = progress?.streak_days ?? 0
-  const longestStreakDays  = progress?.longest_streak_days ?? 0
+  const { progress } = useProgress()
+  const { sessions, loading: sessionsLoading, error: sessionsError } = useRecentSessions(5)
 
-  const maxDone = Math.max(1, ...days.map(d => d.sentencesDone))
+  // One `daily_stats` fetch feeds both the chart and the calendar. A
+  // 6-week window, aligned to end on this week's Sunday (so it chunks
+  // cleanly into Mon–Sun rows) and starting 6 Mondays back — enough past
+  // history for the 30-day chart too. The calendar only issues its own
+  // query when the user pages back past this window.
+  const dowMon = useMemo(() => (new Date().getUTCDay() + 6) % 7, [])
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const { days: stats, loading: historyLoading, error: historyError } =
+    useDailyStatsHistory(42, -(6 - dowMon))
+
+  const calendarDays = useMemo(() => stats.slice(-28), [stats])
+
+  const rollingAccuracy = progress?.rolling_accuracy ?? 0
+  const roundsCompleted = progress?.rounds_completed ?? 0
+  const currentStreak   = liveStreak(progress?.streak_days, progress?.last_practiced_at)
+  const longestStreak   = progress?.longest_streak_days ?? 0
+
+  const accuracyHint =
+    rollingAccuracy >= 90 ? 'Excellent consistency!'
+    : rollingAccuracy >= 75 ? 'Solid and steady'
+    : rollingAccuracy >= 1 ? 'Room to sharpen'
+    : 'No grades yet'
+
+  const points: ActivityPoint[] = useMemo(
+    () => stats
+      .filter(d => d.date <= todayISO)
+      .slice(-rangeDays)
+      .map(d => ({
+        date: d.date,
+        rounds: d.roundsDone,
+        sentences: d.sentencesDone,
+        accuracy: d.sentencesDone > 0 ? Math.round((d.sentencesCorrect / d.sentencesDone) * 100) : null,
+      })),
+    [stats, rangeDays, todayISO],
+  )
 
   return (
     <AppShell>
-      <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Progress</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            Your practice history and accuracy over time.
-          </p>
+      <div className="min-h-screen w-full max-w-6xl px-4 py-8 sm:px-8 sm:py-10 mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-bold sm:text-4xl" style={{ color: 'var(--text-primary)' }}>Progress</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Your learning journey at a glance.
+            </p>
+          </div>
+          <div className="relative inline-flex flex-shrink-0 items-center">
+            <span className="pointer-events-none absolute left-3" style={{ color: 'var(--text-tertiary)' }}>
+              <CalendarIcon width={14} height={14} />
+            </span>
+            <select
+              value={rangeDays}
+              onChange={e => setRangeDays(Number(e.target.value))}
+              aria-label="Time range"
+              className="appearance-none rounded-xl py-2 pl-9 pr-9 text-sm font-medium transition-colors hover-border"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            >
+              {RANGES.map(r => <option key={r.days} value={r.days}>{r.label}</option>)}
+            </select>
+            <span className="pointer-events-none absolute right-3" style={{ color: 'var(--text-tertiary)' }}>
+              <ChevronDownIcon width={13} height={13} />
+            </span>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <div
-              className="w-5 h-5 rounded-full animate-spin"
-              style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
+        {/* Stat row */}
+        <div className="mb-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="sm:col-span-2 xl:col-span-2">
+            <ProgressStatCard
+              label="Rolling accuracy"
+              value={`${rollingAccuracy}%`}
+              hint={accuracyHint}
+              hintTone={rollingAccuracy >= 75 ? 'accent' : 'muted'}
+              ring={rollingAccuracy}
             />
           </div>
-        ) : (
-          <>
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <Card padding="md">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm mb-2"
-                  style={{ backgroundColor: 'var(--accent-subtle)' }}
-                  aria-hidden="true"
-                >
-                  <RoundsIcon />
-                </div>
-                <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{roundsCompleted}</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Rounds completed</p>
-              </Card>
+          <ProgressStatCard
+            label="Rounds completed"
+            value={String(roundsCompleted)}
+            hint="Total rounds"
+            icon={<RoundsIcon size={18} />}
+          />
+          <ProgressStatCard
+            label="Current streak"
+            value={`${currentStreak} day${currentStreak === 1 ? '' : 's'}`}
+            hint={currentStreak >= 1 ? 'Keep it going!' : 'Start a new one'}
+            hintTone={currentStreak >= 1 ? 'accent' : 'muted'}
+            icon={<StreakIcon size={18} />}
+          />
+          <ProgressStatCard
+            label="Longest streak"
+            value={`${longestStreak} day${longestStreak === 1 ? '' : 's'}`}
+            hint="Personal best"
+            icon={<TrophyIcon size={18} />}
+          />
+        </div>
 
-              <Card padding="md">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm mb-2"
-                  style={{ backgroundColor: 'var(--accent-subtle)' }}
-                  aria-hidden="true"
-                >
-                  <AccuracyIcon />
-                </div>
-                <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>{rollingAccuracy}%</p>
-                <p className="text-xs mt-2 mb-1" style={{ color: 'var(--text-tertiary)' }}>Rolling accuracy</p>
-                <ProgressBar value={rollingAccuracy} max={100} aria-label="Rolling accuracy" />
-              </Card>
+        {/* Activity + calendar */}
+        <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <PracticeActivityChart points={points} loading={historyLoading} error={historyError} />
+          </div>
+          <div className="lg:col-span-2">
+            <LearningCalendar baseDays={calendarDays} loading={historyLoading} error={historyError} />
+          </div>
+        </div>
 
-              <Card padding="md">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm mb-2"
-                  style={{ backgroundColor: 'var(--accent-subtle)' }}
-                  aria-hidden="true"
-                >
-                  <StreakIcon />
-                </div>
-                <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {streakDays} day{streakDays === 1 ? '' : 's'}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Current streak</p>
-              </Card>
-
-              <Card padding="md">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm mb-2"
-                  style={{ backgroundColor: 'var(--accent-subtle)' }}
-                  aria-hidden="true"
-                >
-                  <TrophyIcon />
-                </div>
-                <p className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {longestStreakDays} day{longestStreakDays === 1 ? '' : 's'}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Longest streak</p>
-              </Card>
-            </div>
-
-            {/* Per-day history bars */}
-            <Card padding="lg">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Last 14 days</h2>
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Sentences practiced</p>
-              </div>
-
-              {historyError ? (
-                <p className="text-xs" style={{ color: 'var(--error-text)' }} role="alert">
-                  Could not load history: {historyError}
-                </p>
-              ) : (
-                <div
-                  className="flex items-end gap-1.5"
-                  style={{ height: '96px', opacity: historyLoading ? 0.5 : 1 }}
-                  role="list"
-                  aria-label={`Sentences practiced per day over the last ${HISTORY_DAYS} days`}
-                >
-                  {days.map(day => {
-                    const pct = day.sentencesDone > 0
-                      ? Math.max(6, (day.sentencesDone / maxDone) * 100)
-                      : 0
-                    const accuracy = day.sentencesDone > 0
-                      ? Math.round((day.sentencesCorrect / day.sentencesDone) * 100)
-                      : null
-                    const label = new Date(day.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                    const dayNum = day.date.slice(8, 10).replace(/^0/, '')
-                    // `role="img"` is a leaf role — descendant content
-                    // (including a per-bar `title`) is invisible to
-                    // assistive tech. Using `role="list"` on the
-                    // container + `role="listitem"` + `aria-label` here
-                    // (mirroring `StreakCard.tsx`'s pattern) exposes each
-                    // day's actual value instead of just the container's
-                    // generic label.
-                    const dayLabel = day.sentencesDone > 0
-                      ? `${label}: ${day.sentencesDone} sentences, ${accuracy}% accuracy`
-                      : `${label}: no practice`
-
-                    return (
-                      <div
-                        key={day.date}
-                        role="listitem"
-                        aria-label={dayLabel}
-                        className="flex-1 h-full flex flex-col items-center justify-end gap-1"
-                        title={dayLabel}
-                      >
-                        <div
-                          className="w-full rounded-t-md transition-all duration-300"
-                          style={{
-                            height: `${pct}%`,
-                            minHeight: day.sentencesDone > 0 ? '4px' : '2px',
-                            backgroundColor: day.sentencesDone > 0 ? 'var(--accent)' : 'var(--bg-tertiary)',
-                          }}
-                          aria-hidden="true"
-                        />
-                        <span className="text-[9px]" style={{ color: 'var(--text-tertiary)' }} aria-hidden="true">
-                          {dayNum}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </Card>
-          </>
-        )}
+        {/* Recent sessions + quote */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <RecentSessionsCard sessions={sessions} loading={sessionsLoading} error={sessionsError} />
+          </div>
+          <div className="lg:col-span-2">
+            <QuoteCard variant="feature" />
+          </div>
+        </div>
       </div>
     </AppShell>
   )

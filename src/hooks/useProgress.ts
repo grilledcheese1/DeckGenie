@@ -61,7 +61,13 @@ export function useProgress() {
 
   const load = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      // Read path: take the user id from the cached session instead of a
+      // network `getUser()` round-trip on every mount. The three queries
+      // below are RLS-scoped to `auth.uid()` server-side regardless. The
+      // write helpers further down keep `getUser()` — verify identity
+      // before mutating.
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user ?? null
       if (user) {
         const [{ data: prog }, { data: sett }, { count }] = await Promise.all([
           supabase.from('progress').select('*').eq('user_id', user.id).single(),
