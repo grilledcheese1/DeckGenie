@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Settings } from '@/types'
 import { ThemePicker } from '@/components/ui/ThemePicker'
 import { loadSavedTheme, type ThemeId } from '@/lib/theme'
 import { saveApiKey, getApiKey } from '@/lib/byoKey'
+import { SettingCard } from './SettingCard'
+import {
+  HskIcon, StrictnessIcon, PracticeModeIcon, SessionIcon, DisplayIcon, ThemeIcon,
+  LenientIcon, BalancedIcon, StrictIcon, FreeSentenceIcon, KeyIcon, CheckIcon, SaveIcon,
+} from './settingsIcons'
 
 const HSK_DESCRIPTIONS: Record<number, string> = {
   1: 'Complete beginner — ~150 basic words',
@@ -16,11 +21,22 @@ const HSK_DESCRIPTIONS: Record<number, string> = {
   6: 'Advanced — ~5000 words',
 }
 
-const STRICTNESS_LABELS: Record<number, { label: string; desc: string }> = {
-  1: { label: 'Lenient',  desc: 'Core meaning counts, phrasing is flexible' },
-  2: { label: 'Balanced', desc: 'Meaning clear, minor phrasing ok' },
-  3: { label: 'Strict',   desc: 'Precise and idiomatic translations only' },
-}
+const STRICTNESS_OPTIONS: { value: 1 | 2 | 3; label: string; desc: string; icon: ReactNode }[] = [
+  { value: 1, label: 'Lenient',  desc: 'Core meaning counts, phrasing is flexible', icon: <LenientIcon /> },
+  { value: 2, label: 'Balanced', desc: 'Meaning clear, minor phrasing ok',          icon: <BalancedIcon /> },
+  { value: 3, label: 'Strict',   desc: 'Precise and idiomatic translations only',   icon: <StrictIcon /> },
+]
+
+const PRACTICE_MODE_OPTIONS: { value: 'static' | 'ai'; label: string; desc: string; icon: ReactNode }[] = [
+  { value: 'static', label: 'Free sentences',            desc: 'Pre-written sentences, no key needed', icon: <FreeSentenceIcon /> },
+  { value: 'ai',     label: 'My own Anthropic API key',  desc: 'AI-generated sentences using your key', icon: <KeyIcon /> },
+]
+
+const SESSION_ROWS: { label: string; key: 'sentences_per_round' | 'rounds_before_unlock' | 'words_per_unlock'; min: number; max: number }[] = [
+  { label: 'Sentences per round',  key: 'sentences_per_round',  min: 5, max: 20 },
+  { label: 'Rounds before unlock', key: 'rounds_before_unlock', min: 1, max: 10 },
+  { label: 'New words per unlock', key: 'words_per_unlock',     min: 1, max: 10 },
+]
 
 interface Props {
   mode: 'onboarding' | 'edit'
@@ -28,6 +44,85 @@ interface Props {
   onBack?: () => void
   highlightApiKey?: boolean
 }
+
+/* ── small presentational bits ─────────────────────────────────────── */
+
+function OptionCard({ selected, icon, title, desc, onClick }: {
+  selected: boolean
+  icon: ReactNode
+  title: string
+  desc: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className="relative flex w-full flex-col gap-2 rounded-xl p-4 pr-8 text-left transition-all hover-border"
+      style={{
+        backgroundColor: selected ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
+        border: selected ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+      }}
+    >
+      {selected && (
+        <span
+          className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+        >
+          <CheckIcon width={11} height={11} />
+        </span>
+      )}
+      <span style={{ color: selected ? 'var(--accent-text)' : 'var(--text-secondary)' }}>{icon}</span>
+      <span
+        className="text-sm font-semibold"
+        style={{ color: selected ? 'var(--accent-text)' : 'var(--text-primary)' }}
+      >
+        {title}
+      </span>
+      <span
+        className="text-xs leading-snug"
+        style={{ color: selected ? 'var(--accent-text)' : 'var(--text-tertiary)', opacity: selected ? 0.85 : 1 }}
+      >
+        {desc}
+      </span>
+    </button>
+  )
+}
+
+function Segmented<T extends string>({ value, options, onChange }: {
+  value: T | undefined
+  options: readonly T[]
+  onChange: (v: T) => void
+}) {
+  return (
+    <div
+      className="inline-flex rounded-lg p-0.5"
+      style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
+    >
+      {options.map(opt => {
+        const active = value === opt
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            aria-pressed={active}
+            className="rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors"
+            style={{
+              backgroundColor: active ? 'var(--accent)' : 'transparent',
+              color: active ? '#fff' : 'var(--text-tertiary)',
+            }}
+          >
+            {opt}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ── form ──────────────────────────────────────────────────────────── */
 
 export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   const isFirstRun = mode === 'onboarding'
@@ -134,304 +229,337 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
     }
   }
 
-  const selectedChip: React.CSSProperties = {
-    backgroundColor: 'var(--accent-subtle)',
-    border: '1px solid var(--accent)',
-    color: 'var(--accent-text)',
-  }
-  const unselectedChip: React.CSSProperties = {
-    backgroundColor: 'var(--bg-secondary)',
-    border: '1px solid var(--border)',
-    color: 'var(--text-tertiary)',
-  }
-
   return (
     <>
-      <div className="mb-10">
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="text-sm mb-6 flex items-center gap-1.5 transition-colors"
+      {/* Header */}
+      <div className="mb-8 flex items-start justify-between gap-6">
+        <div>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="mb-4 flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
+              style={{ color: 'var(--accent-text)' }}
+            >
+              ← Back
+            </button>
+          )}
+          <h1 className="text-3xl font-bold sm:text-4xl" style={{ color: 'var(--text-primary)' }}>
+            {isFirstRun
+              ? <>Welcome to <span className="font-hanzi" style={{ color: 'var(--hanzi-color)' }}>音吉</span></>
+              : 'Settings'}
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {isFirstRun
+              ? 'Tell us where you want to start — you can change this any time.'
+              : 'Customize your learning experience'}
+          </p>
+        </div>
+
+        <div className="hidden items-start gap-3 lg:flex" aria-hidden="true">
+          <div
+            className="text-right text-[11px] font-semibold uppercase leading-tight tracking-[0.22em]"
             style={{ color: 'var(--text-tertiary)' }}
           >
-            ← Back
-          </button>
-        )}
-        <h1 className="text-2xl font-medium" style={{ color: 'var(--text-primary)' }}>
-          {isFirstRun
-            ? <span>Welcome to <span className="font-hanzi" style={{ color: 'var(--hanzi-color)' }}>音吉</span></span>
-            : 'Settings'}
-        </h1>
-        {isFirstRun && (
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Tell us where you want to start — you can change this any time.
-          </p>
-        )}
+            <div>Small</div>
+            <div>Steps</div>
+            <div className="mt-1">Big</div>
+            <div>Progress</div>
+            <div className="ml-auto mt-2 h-0.5 w-8" style={{ backgroundColor: 'var(--accent)' }} />
+          </div>
+          <svg
+            width="52" height="52" viewBox="0 0 24 24" fill="none"
+            stroke="var(--accent)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"
+            style={{ opacity: 0.5 }}
+          >
+            <path d="M5 21c8 0 14-6 14-14V5h-2C9 5 5 11 5 19v2Z" />
+            <path d="M5 21c2.5-4 6-7 10.5-9" />
+          </svg>
+        </div>
       </div>
 
       {!loaded && (
         <div className="flex justify-center py-12">
           <div
-            className="w-5 h-5 rounded-full animate-spin"
+            className="h-5 w-5 animate-spin rounded-full"
             style={{ border: '2px solid var(--accent)', borderTopColor: 'transparent' }}
           />
         </div>
       )}
 
       {loaded && (
-      <>
-      <div className="space-y-8">
-        {/* HSK level */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            {isFirstRun ? 'Starting level' : 'HSK level'}
-          </h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {[1,2,3,4,5,6].map(level => (
-              <button
-                key={level}
-                onClick={() => update('starting_hsk', level as Settings['starting_hsk'])}
-                className="rounded-xl py-3 text-center text-sm font-medium transition-all hover-border"
-                style={settings.starting_hsk === level ? selectedChip : unselectedChip}
-              >
-                HSK {level}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-            {HSK_DESCRIPTIONS[settings.starting_hsk ?? 2]}
-          </p>
-        </section>
-
-        {/* Grading strictness */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            Grading strictness
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {[1,2,3].map(level => {
-              const s = STRICTNESS_LABELS[level]
-              const isSelected = settings.strictness === level
-              return (
-                <button
-                  key={level}
-                  onClick={() => update('strictness', level as Settings['strictness'])}
-                  className="rounded-xl p-3 text-left transition-all hover-border"
-                  style={isSelected ? selectedChip : unselectedChip}
-                >
-                  <p className="text-sm font-medium" style={{ color: isSelected ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                    {s.label}
-                  </p>
-                  <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-tertiary)' }}>
-                    {s.desc}
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* Practice mode */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            Practice mode
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              { value: 'static' as const, label: 'Free sentences', desc: 'Pre-written sentences, no key needed' },
-              { value: 'ai' as const, label: 'My own Anthropic API key', desc: 'AI-generated sentences using your key' },
-            ]).map(({ value, label, desc }) => {
-              const isSelected = settings.practice_mode === value
-              return (
-                <button
-                  key={value}
-                  onClick={() => update('practice_mode', value)}
-                  className="rounded-xl p-3 text-left transition-all hover-border"
-                  style={isSelected ? selectedChip : unselectedChip}
-                >
-                  <p className="text-sm font-medium" style={{ color: isSelected ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
-                    {label}
-                  </p>
-                  <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--text-tertiary)' }}>
-                    {desc}
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-
-          {settings.practice_mode === 'ai' && (
-            <div
-              ref={apiKeySectionRef}
-              className="mt-3 space-y-2 rounded-xl transition-shadow"
-              style={keyHighlighted ? { boxShadow: '0 0 0 3px var(--accent-subtle), 0 0 0 1px var(--accent)' } : undefined}
+        <>
+          <div className="space-y-4">
+            {/* HSK level */}
+            <SettingCard
+              icon={<HskIcon />}
+              title={isFirstRun ? 'Starting level' : 'HSK Level'}
+              description="Select your current Chinese proficiency level"
             >
-              <div className="flex gap-2">
-                <input
-                  ref={apiKeyInputRef}
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => {
-                    setApiKey(e.target.value)
-                    saveApiKey(e.target.value)
-                    setKeyStatus('untested')
-                  }}
-                  placeholder="sk-ant-..."
-                  className="flex-1 rounded-xl px-3 py-2.5 text-sm"
-                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
-                />
-                <button
-                  onClick={testApiKey}
-                  disabled={!apiKey.trim() || keyStatus === 'testing'}
-                  className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover-border disabled:opacity-50"
-                  style={unselectedChip}
-                >
-                  {keyStatus === 'testing' ? 'Testing…' : 'Test key'}
-                </button>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {[1, 2, 3, 4, 5, 6].map(level => {
+                  const selected = settings.starting_hsk === level
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => update('starting_hsk', level as Settings['starting_hsk'])}
+                      aria-pressed={selected}
+                      className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium transition-all hover-border"
+                      style={{
+                        backgroundColor: selected ? 'var(--accent)' : 'var(--bg-tertiary)',
+                        color: selected ? '#fff' : 'var(--text-secondary)',
+                        border: selected ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      }}
+                    >
+                      HSK {level}
+                      {selected && (
+                        <span
+                          className="flex h-4 w-4 items-center justify-center rounded-full"
+                          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+                        >
+                          <CheckIcon width={9} height={9} />
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
-              {keyStatus !== 'untested' && (
-                <p
-                  className="text-xs"
-                  style={{
-                    color: keyStatus === 'valid'
-                      ? 'var(--accent-text)'
-                      : keyStatus === 'invalid'
-                        ? 'var(--error-text)'
-                        : 'var(--text-tertiary)',
-                  }}
-                >
-                  {keyStatus === 'testing' && 'Checking key…'}
-                  {keyStatus === 'valid' && 'Key is valid'}
-                  {keyStatus === 'invalid' && 'Key is invalid'}
-                </p>
-              )}
-            </div>
-          )}
-        </section>
+              <p className="mt-3 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {HSK_DESCRIPTIONS[settings.starting_hsk ?? 2]}
+              </p>
+            </SettingCard>
 
-        {/* Session */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            Session
-          </h2>
-          <div
-            className="space-y-1 rounded-2xl overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-          >
-            {[
-              { label: 'Sentences per round', key: 'sentences_per_round' as const, min: 5,  max: 20 },
-              { label: 'Rounds before unlock', key: 'rounds_before_unlock' as const, min: 1, max: 10 },
-              { label: 'New words per unlock',  key: 'words_per_unlock' as const,   min: 1, max: 10 },
-            ].map(({ label, key, min, max }, i, arr) => (
+            {/* Grading strictness */}
+            <SettingCard
+              icon={<StrictnessIcon />}
+              title="Grading Strictness"
+              description="Choose how strictly your answers are evaluated"
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {STRICTNESS_OPTIONS.map(o => (
+                  <OptionCard
+                    key={o.value}
+                    selected={settings.strictness === o.value}
+                    icon={o.icon}
+                    title={o.label}
+                    desc={o.desc}
+                    onClick={() => update('strictness', o.value)}
+                  />
+                ))}
+              </div>
+            </SettingCard>
+
+            {/* Practice mode */}
+            <SettingCard
+              icon={<PracticeModeIcon />}
+              title="Practice Mode"
+              description="Choose how you want to practice"
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {PRACTICE_MODE_OPTIONS.map(o => (
+                  <OptionCard
+                    key={o.value}
+                    selected={settings.practice_mode === o.value}
+                    icon={o.icon}
+                    title={o.label}
+                    desc={o.desc}
+                    onClick={() => update('practice_mode', o.value)}
+                  />
+                ))}
+              </div>
+
+              {settings.practice_mode === 'ai' && (
+                <div
+                  ref={apiKeySectionRef}
+                  className="mt-3 space-y-2 rounded-xl transition-shadow"
+                  style={keyHighlighted ? { boxShadow: '0 0 0 3px var(--accent-subtle), 0 0 0 1px var(--accent)' } : undefined}
+                >
+                  <div className="flex gap-2">
+                    <input
+                      ref={apiKeyInputRef}
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => {
+                        setApiKey(e.target.value)
+                        saveApiKey(e.target.value)
+                        setKeyStatus('untested')
+                      }}
+                      placeholder="sk-ant-..."
+                      className="flex-1 rounded-xl px-3 py-2.5 text-sm"
+                      style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={testApiKey}
+                      disabled={!apiKey.trim() || keyStatus === 'testing'}
+                      className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover-border disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                    >
+                      {keyStatus === 'testing' ? 'Testing…' : 'Test key'}
+                    </button>
+                  </div>
+                  {keyStatus !== 'untested' && (
+                    <p
+                      className="text-xs"
+                      style={{
+                        color: keyStatus === 'valid'
+                          ? 'var(--accent-text)'
+                          : keyStatus === 'invalid'
+                            ? 'var(--error-text)'
+                            : 'var(--text-tertiary)',
+                      }}
+                    >
+                      {keyStatus === 'testing' && 'Checking key…'}
+                      {keyStatus === 'valid' && 'Key is valid'}
+                      {keyStatus === 'invalid' && 'Key is invalid'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </SettingCard>
+
+            {/* Session */}
+            <SettingCard
+              icon={<SessionIcon />}
+              title="Session"
+              description="Adjust your study session preferences"
+              layout="split"
+            >
               <div
-                key={key}
-                className="flex items-center justify-between px-4 py-3.5"
-                style={i < arr.length - 1 ? { borderBottom: '1px solid var(--border)' } : {}}
+                className="overflow-hidden rounded-xl"
+                style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
               >
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => update(key, Math.max(min, (settings[key] as number) - 1) as never)}
-                    className="w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-colors hover-bg"
-                    style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {settings[key] as number}
-                  </span>
-                  <button
-                    onClick={() => update(key, Math.min(max, (settings[key] as number) + 1) as never)}
-                    className="w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-colors hover-bg"
-                    style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                  >
-                    +
-                  </button>
+                {SESSION_ROWS.map(({ label, key, min, max }, i) => {
+                  const value = (settings[key] as number) ?? min
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between px-4 py-3"
+                      style={i < SESSION_ROWS.length - 1 ? { borderBottom: '1px solid var(--border)' } : undefined}
+                    >
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Decrease ${label}`}
+                          onClick={() => update(key, Math.max(min, value - 1) as never)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-base transition-colors hover-bg"
+                          style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                        >
+                          −
+                        </button>
+                        <span className="w-6 text-center text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {value}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Increase ${label}`}
+                          onClick={() => update(key, Math.min(max, value + 1) as never)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-base transition-colors hover-bg"
+                          style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </SettingCard>
+
+            {/* Display */}
+            <SettingCard
+              icon={<DisplayIcon />}
+              title="Display"
+              description="Control what you see during practice"
+              layout="split"
+            >
+              <div
+                className="overflow-hidden rounded-xl"
+                style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
+              >
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  style={{ borderBottom: '1px solid var(--border)' }}
+                >
+                  <div>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show pinyin</p>
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Display pinyin with Chinese characters</p>
+                  </div>
+                  <Segmented
+                    value={settings.show_pinyin}
+                    options={['always', 'tap', 'never'] as const}
+                    onChange={v => update('show_pinyin', v)}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show vocab hints</p>
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Show hints before or after answering</p>
+                  </div>
+                  <Segmented
+                    value={settings.show_hints}
+                    options={['before', 'after', 'never'] as const}
+                    onChange={v => update('show_hints', v)}
+                  />
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+            </SettingCard>
 
-        {/* Display */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            Display
-          </h2>
-          <div
-            className="space-y-1 rounded-2xl overflow-hidden"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-          >
-            <div
-              className="flex items-center justify-between px-4 py-3.5"
-              style={{ borderBottom: '1px solid var(--border)' }}
+            {/* Theme */}
+            <SettingCard
+              icon={<ThemeIcon />}
+              title="Theme"
+              description="Choose a theme for the app"
+              layout="split"
             >
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show pinyin</span>
-              <div className="flex gap-1">
-                {(['always','tap','never'] as const).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => update('show_pinyin', v)}
-                    className="px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize"
-                    style={settings.show_pinyin === v ? selectedChip : { ...unselectedChip, border: '1px solid transparent' }}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Show vocab hints</span>
-              <div className="flex gap-1">
-                {(['before','after','never'] as const).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => update('show_hints', v)}
-                    className="px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize"
-                    style={settings.show_hints === v ? selectedChip : { ...unselectedChip, border: '1px solid transparent' }}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <ThemePicker selected={theme} onChange={setTheme} showLabel={false} />
+            </SettingCard>
           </div>
-        </section>
 
-        {/* Theme */}
-        <section>
-          <h2 className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--text-tertiary)' }}>
-            Theme
-          </h2>
-          <ThemePicker selected={theme} onChange={setTheme} />
-        </section>
-      </div>
-
-      <div className="mt-10">
-        {saveError && (
-          <p className="text-xs mb-3 px-3 py-2 rounded-lg"
-            style={{ backgroundColor: 'var(--error-bg)', border: '1px solid var(--error-border)', color: 'var(--error-text)' }}>
-            {saveError}
-          </p>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full disabled:opacity-50 font-medium rounded-xl py-3.5 text-sm transition-colors hover-accent"
-          style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-        >
-          {saving
-            ? <span className="flex items-center justify-center gap-2">
-                <span
-                  className="w-4 h-4 rounded-full animate-spin"
-                  style={{ border: '2px solid white', borderTopColor: 'transparent' }}
-                />
-                Saving…
-              </span>
-            : isFirstRun ? 'Start practicing →' : 'Save settings'}
-        </button>
-      </div>
-      </>
+          {/* Save */}
+          <div className="mt-6">
+            {saveError && (
+              <p
+                className="mb-3 rounded-lg px-3 py-2 text-xs"
+                style={{ backgroundColor: 'var(--error-bg)', border: '1px solid var(--error-border)', color: 'var(--error-text)' }}
+              >
+                {saveError}
+              </p>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-semibold transition-all active:scale-[0.99] disabled:opacity-50"
+              style={{
+                backgroundImage: 'linear-gradient(90deg, var(--gradient-cta-from), var(--gradient-cta-to))',
+                color: '#fff',
+              }}
+            >
+              {saving ? (
+                <>
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full"
+                    style={{ border: '2px solid #fff', borderTopColor: 'transparent' }}
+                  />
+                  Saving…
+                </>
+              ) : isFirstRun ? (
+                'Start practicing →'
+              ) : (
+                <>
+                  <SaveIcon width={16} height={16} />
+                  Save Settings
+                </>
+              )}
+            </button>
+            <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {isFirstRun
+                ? 'You can change any of this later in Settings.'
+                : 'Theme changes apply right away; other preferences save when you press the button.'}
+            </p>
+          </div>
+        </>
       )}
     </>
   )

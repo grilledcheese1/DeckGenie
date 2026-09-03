@@ -4,25 +4,22 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProgress } from '@/hooks/useProgress'
-import { useTodayStats } from '@/hooks/useTodayStats'
 import { createClient } from '@/lib/supabase/client'
 import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
-import { Card } from '@/components/ui/Card'
-import { ProgressBar } from '@/components/ui/ProgressBar'
+import { LayoutGroup } from 'motion/react'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
 import { NavLink } from './NavLink'
 import { Wordmark } from './Wordmark'
 
 /**
- * Desktop sidebar — logo, nav list, and a bottom-anchored Daily Goal card +
- * profile chip (with a Settings/Sign-out dropdown). Hidden below `md`; see
+ * Desktop sidebar — logo, nav list, and a bottom-anchored profile chip
+ * (with a Settings/Sign-out dropdown). Hidden below `md`; see
  * `MobileTopBar`/`MobileDrawer` for the small-viewport equivalent.
  */
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { settings, reload } = useProgress()
-  const { sentencesDone, loading: statsLoading, error: statsError } = useTodayStats()
 
   const [email, setEmail] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -98,15 +95,8 @@ export function Sidebar() {
     router.push('/login')
   }
 
-  const sentencesPerRound = settings?.sentences_per_round ?? 10
   const hskLevel = settings?.starting_hsk ?? 1
   const initial = email ? email[0].toUpperCase() : '?'
-
-  // An RLS denial / network failure should never silently render as "0
-  // sentences today" — show a neutral "—" instead once data has failed to
-  // load, rather than a confident (and wrong) count.
-  const dailyGoalDisplay = statsError ? '—' : statsLoading ? '…' : sentencesDone
-  const dailyGoalValue = statsError || statsLoading ? 0 : sentencesDone
 
   return (
     <aside
@@ -120,25 +110,12 @@ export function Sidebar() {
 
       {/* Nav list */}
       <nav className="flex-1 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(item => (
-          <NavLink key={item.href} item={item} active={isNavItemActive(pathname, item.href)} />
-        ))}
+        <LayoutGroup id="sidebar-nav">
+          {NAV_ITEMS.map(item => (
+            <NavLink key={item.href} item={item} active={isNavItemActive(pathname, item.href)} />
+          ))}
+        </LayoutGroup>
       </nav>
-
-      {/* Daily Goal mini-card */}
-      <Card padding="md" className="mb-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Daily goal</p>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {dailyGoalDisplay} / {sentencesPerRound}
-          </p>
-        </div>
-        <ProgressBar
-          value={dailyGoalValue}
-          max={sentencesPerRound}
-          aria-label="Today's sentences toward daily goal"
-        />
-      </Card>
 
       {/* Profile chip + dropdown */}
       <div ref={chipRef} className="relative flex-shrink-0">

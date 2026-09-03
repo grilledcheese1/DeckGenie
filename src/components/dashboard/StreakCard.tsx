@@ -3,6 +3,7 @@
 import { Card } from '@/components/ui/Card'
 import { useProgress } from '@/hooks/useProgress'
 import { useWeeklyActivity } from '@/hooks/useWeeklyActivity'
+import { liveStreak } from '@/lib/streak'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -16,7 +17,7 @@ export function StreakCard() {
   const { progress } = useProgress()
   const { days, loading, error } = useWeeklyActivity()
 
-  const streak = progress?.streak_days ?? 0
+  const streak = liveStreak(progress?.streak_days, progress?.last_practiced_at)
 
   // `useWeeklyActivity` returns the last 7 calendar days in chronological
   // (oldest-first) order, which only starts on Monday if today happens to be

@@ -23,6 +23,36 @@
 }
 .grade-pop { animation: grade-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
+/* ── Progress "Practice activity" chart ─────────────────────────────
+   A short bright segment sweeps along the line (via a dashed stroke
+   whose offset animates), and each data dot's glow halo flares as the
+   sweep passes it — the per-dot `animation-delay` is set inline to the
+   dot's position along the line, and the two animations share a period
+   (--activity-sweep) so they stay in sync. */
+.activity-chart { --activity-sweep: 3.2s; }
+
+@keyframes activity-trace {
+  from { stroke-dashoffset: 0.18; }
+  to   { stroke-dashoffset: -1; }
+}
+.activity-trace { animation: activity-trace var(--activity-sweep) linear infinite; }
+
+@keyframes activity-dot-flare {
+  0%, 24%, 100% { opacity: 0.14; transform: scale(0.7); }
+  8%            { opacity: 0.6;  transform: scale(1.3); }
+}
+.activity-dot-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.14;
+  animation: activity-dot-flare var(--activity-sweep) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-trace { display: none; }
+  .activity-dot-halo { animation: none; opacity: 0.18; transform: none; }
+}
+
 textarea:focus {
   outline: none;
   box-shadow: 0 0 0 1.5px rgba(120, 180, 140, 0.4);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { gsap } from 'gsap'
+import { LayoutGroup } from 'motion/react'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
 import { NavLink } from './NavLink'
 import { Wordmark } from './Wordmark'
@@ -101,14 +102,16 @@ export function MobileDrawer({ onClose }: Props) {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {NAV_ITEMS.map(item => (
-            // onClick={onClose} (not handleClose) — a nav click should close
-            // the drawer instantly, whether or not the route actually
-            // changes (tapping the *current* route's link is a common way
-            // to just glance at the nav and dismiss it, and AppShell's
-            // route-change close only fires when the pathname differs).
-            <NavLink key={item.href} item={item} active={isNavItemActive(pathname, item.href)} onClick={onClose} />
-          ))}
+          <LayoutGroup id="mobile-nav">
+            {NAV_ITEMS.map(item => (
+              // onClick={onClose} (not handleClose) — a nav click should close
+              // the drawer instantly, whether or not the route actually
+              // changes (tapping the *current* route's link is a common way
+              // to just glance at the nav and dismiss it, and AppShell's
+              // route-change close only fires when the pathname differs).
+              <NavLink key={item.href} item={item} active={isNavItemActive(pathname, item.href)} onClick={onClose} />
+            ))}
+          </LayoutGroup>
         </nav>
       </div>
     </div>

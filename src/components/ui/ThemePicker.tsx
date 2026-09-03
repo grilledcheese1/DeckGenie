@@ -5,17 +5,22 @@ import { THEMES, applyTheme, type ThemeId } from '@/lib/theme'
 interface Props {
   selected: ThemeId
   onChange: (id: ThemeId) => void
+  /** Hide the internal "Choose your theme" label when a parent already
+   *  supplies a heading (e.g. the settings Theme card). */
+  showLabel?: boolean
 }
 
-export function ThemePicker({ selected, onChange }: Props) {
+export function ThemePicker({ selected, onChange, showLabel = true }: Props) {
   return (
     <div className="w-full">
-      <p
-        style={{ color: 'var(--text-tertiary)' }}
-        className="text-xs uppercase tracking-widest mb-3"
-      >
-        Choose your theme
-      </p>
+      {showLabel && (
+        <p
+          style={{ color: 'var(--text-tertiary)' }}
+          className="text-xs uppercase tracking-widest mb-3"
+        >
+          Choose your theme
+        </p>
+      )}
       <div className="grid grid-cols-3 gap-2">
         {THEMES.map(theme => {
           const isSelected = selected === theme.id
@@ -27,17 +32,19 @@ export function ThemePicker({ selected, onChange }: Props) {
                 applyTheme(theme.id)
                 onChange(theme.id)
               }}
-              className="relative rounded-2xl p-0.5 transition-all"
-              style={{
-                background: isSelected ? p.accent : 'transparent',
-                outline: 'none',
-              }}
+              className="relative rounded-2xl transition-all"
+              style={{ background: 'transparent', outline: 'none' }}
               aria-label={`Select ${theme.name} theme`}
               aria-pressed={isSelected}
             >
+              {/* Accent frame — wraps only the preview, not the name */}
+              <div
+                className="rounded-xl p-0.5"
+                style={{ background: isSelected ? p.accent : 'transparent' }}
+              >
               {/* Mini app preview */}
               <div
-                className="rounded-xl overflow-hidden w-full"
+                className="rounded-[10px] overflow-hidden w-full"
                 style={{
                   background: p.bg,
                   border: `0.5px solid ${p.border}`,
@@ -84,6 +91,7 @@ export function ThemePicker({ selected, onChange }: Props) {
                 >
                   Submit
                 </div>
+              </div>
               </div>
 
               {/* Theme name below preview */}
