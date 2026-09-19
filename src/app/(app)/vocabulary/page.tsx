@@ -11,7 +11,7 @@ import { VocabPagination } from '@/components/vocab/VocabPagination'
 import { FavoritesExpandedPanel } from '@/components/vocab/FavoritesExpandedPanel'
 
 export default function VocabularyPage() {
-  const { vocabCount, settings } = useProgress()
+  const { vocabCount, settings, reload } = useProgress()
   const {
     words, totalCount, totalPages, loading, error,
     page, setPage,
@@ -53,7 +53,13 @@ export default function VocabularyPage() {
         words={words}
         loading={loading}
         onToggleFavorite={word => setFavorite(word, !word.is_favorite)}
-        onDelete={deleteWord}
+        // useVocabTable's own totalCount (fed to VocabPagination below)
+        // updates itself locally on delete, but vocabCount (from
+        // useProgress, fed to VocabPageHeader/VocabStatsRow above) does
+        // not -- without this reload(), the header/stats "total words"
+        // count would go stale relative to the pagination footer right
+        // after a delete.
+        onDelete={async id => { await deleteWord(id); reload() }}
       />
 
       <VocabPagination

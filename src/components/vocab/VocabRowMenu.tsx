@@ -16,13 +16,25 @@ const EDGE = 8
 /**
  * The "•••" row menu -- mirrors CharTooltip.tsx's anchor/flip/GSAP
  * convention (practice's analysis-mode character tooltip): a small
- * popover, positioned relative to its `position: relative` parent cell,
- * flipping above the anchor when there isn't room below. Two internal
- * steps: "menu" (Delete word) -> "confirm" (Delete X? Cancel/Delete).
+ * popover, flipping above its anchor when there isn't room below. Two
+ * internal steps: "menu" (Delete word) -> "confirm" (Delete X? Cancel/
+ * Delete).
+ *
+ * Positioned with `position: fixed` from the anchor's viewport rect
+ * (same technique as `FavoritesExpandedPanel`), not `position: absolute`
+ * against its parent `<td>` -- `VocabTable`'s `overflow-x-auto` wrapper
+ * implicitly sets `overflow-y: auto` too (per the CSS overflow spec,
+ * setting only one axis non-visible forces the other to auto), which
+ * would clip an absolutely-positioned popover for any row near the
+ * bottom of the table. Fixed positioning escapes that clipping ancestor
+ * entirely. Found during Task 13's integration review -- invisible to
+ * this component's own isolated review, since it only manifests once
+ * composed inside VocabTable's actual wrapper.
  */
 export function VocabRowMenu({ word, onDelete, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const [placement, setPlacement] = useState<'top' | 'bottom'>('bottom')
+  const [pos, setPos] = useState<{ top: number; right: number } | { bottom: number; right: number }>({ top: 0, right: 0 })
   const [step, setStep] = useState<'menu' | 'confirm'>('menu')
 
   useLayoutEffect(() => {
@@ -32,7 +44,13 @@ export function VocabRowMenu({ word, onDelete, onClose }: Props) {
     const rect = anchor.getBoundingClientRect()
     const spaceAbove = rect.top - GAP - EDGE
     const spaceBelow = window.innerHeight - rect.bottom - GAP - EDGE
-    setPlacement(spaceBelow >= el.offsetHeight || spaceBelow > spaceAbove ? 'bottom' : 'top')
+    const nextPlacement = spaceBelow >= el.offsetHeight || spaceBelow > spaceAbove ? 'bottom' : 'top'
+    setPlacement(nextPlacement)
+    const right = Math.max(EDGE, window.innerWidth - rect.right)
+    setPos(nextPlacement === 'bottom'
+      ? { top: rect.bottom + GAP, right }
+      : { bottom: window.innerHeight - rect.top + GAP, right }
+    )
   }, [step])
 
   useLayoutEffect(() => {
@@ -48,10 +66,9 @@ export function VocabRowMenu({ word, onDelete, onClose }: Props) {
       <div className="fixed inset-0 z-30" onClick={e => { e.stopPropagation(); onClose() }} />
       <div
         ref={ref}
-        className="absolute z-40 text-left"
+        className="fixed z-40 text-left"
         style={{
-          ...(placement === 'top' ? { bottom: `calc(100% + ${GAP}px)` } : { top: `calc(100% + ${GAP}px)` }),
-          right: 0,
+          ...pos,
           width: step === 'confirm' ? '200px' : '140px',
         }}
         onClick={e => e.stopPropagation()}
