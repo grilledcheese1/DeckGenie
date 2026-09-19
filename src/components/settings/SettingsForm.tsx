@@ -43,6 +43,19 @@ interface Props {
   onDone: () => void
   onBack?: () => void
   highlightApiKey?: boolean
+  /**
+   * Called right after a successful save, before `onDone`. `SettingsForm`
+   * writes straight to Supabase (and to its own `hanzi_settings`
+   * localStorage cache) without going through `useProgress()` — it can't
+   * call that hook directly, since `mode === 'onboarding'` renders outside
+   * `ProgressProvider` (src/app/onboarding/page.tsx). The `mode === 'edit'`
+   * caller (which *is* inside the provider) passes its `reload` here so
+   * the shared context — which now stays mounted across client-side nav
+   * instead of remounting per page — picks up the change immediately,
+   * instead of every other already-mounted page reading stale settings
+   * until a hard reload.
+   */
+  onSaved?: () => void
 }
 
 /* ── small presentational bits ─────────────────────────────────────── */
@@ -124,7 +137,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
 
 /* ── form ──────────────────────────────────────────────────────────── */
 
-export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
+export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }: Props) {
   const isFirstRun = mode === 'onboarding'
   const supabase = createClient()
 
@@ -197,6 +210,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
       }
     } catch (e) { setSaveError(String(e)); setSaving(false); return }
     localStorage.setItem('hanzi_settings', JSON.stringify(settings))
+    onSaved?.()
     if (isFirstRun) {
       try {
         await fetch('/api/words', {
