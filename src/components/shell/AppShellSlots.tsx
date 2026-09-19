@@ -4,7 +4,6 @@ import { createContext, useContext, useLayoutEffect, type ReactNode } from 'reac
 
 interface AppShellSlotsValue {
   setRailContent: (node: ReactNode) => void
-  setChromeHidden: (hidden: boolean) => void
 }
 
 const AppShellSlotsContext = createContext<AppShellSlotsValue | null>(null)
@@ -41,19 +40,4 @@ export function useRightRail(node: ReactNode) {
     setRailContent(node)
     return () => setRailContent(null)
   }, [setRailContent, node])
-}
-
-/**
- * Hides `AppShell`'s chrome (sidebar/topbar/drawer/rail) entirely, so a
- * page renders as bare content — used only by settings onboarding
- * (`?firstRun=true`), which must not offer the sidebar's nav/sign-out
- * escape hatch before a brand-new user's settings are saved. Same
- * same-paint/clear-on-unmount reasoning as `useRightRail`.
- */
-export function useHideAppShellChrome(hidden: boolean) {
-  const { setChromeHidden } = useAppShellSlots()
-  useLayoutEffect(() => {
-    setChromeHidden(hidden)
-    return () => setChromeHidden(false)
-  }, [setChromeHidden, hidden])
 }

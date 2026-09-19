@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { WrongAnswerCard } from '@/components/practice/WrongAnswerCard'
 import { useReviewHistory, sentenceAttemptToWrongAnswer } from '@/hooks/useReviewHistory'
 
@@ -27,6 +27,20 @@ export default function ReviewPage() {
     if (!el) return
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) loadMore()
   }, [loadMore])
+
+  // Scroll-proximity loading (above) never fires if a page of results
+  // doesn't overflow the container in the first place — a large viewport
+  // or short card content can leave `hasMore: true` with no scrollbar to
+  // ever trigger `handleScroll`, silently stalling pagination. After each
+  // load, top up until either the container actually scrolls or there's
+  // nothing left to fetch. `loadMore` already no-ops while a request is
+  // in flight or `hasMore` is false, so calling it here is safe even if
+  // this fires before the previous call has settled.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || loading || !hasMore) return
+    if (el.scrollHeight <= el.clientHeight) loadMore()
+  }, [attempts, loading, hasMore, loadMore])
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto flex flex-col">

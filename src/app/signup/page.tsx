@@ -43,7 +43,7 @@ function SignupContent() {
       // Email confirmation is disabled — user is immediately logged in.
       // Brand-new account has no vocab yet, so route through onboarding to seed it
       // (mirrors the /auth/callback OAuth path).
-      window.location.href = '/settings?firstRun=true'
+      window.location.href = '/onboarding'
     } else {
       // Email confirmation is enabled — confirmation email sent
       setConfirmationSent(true)

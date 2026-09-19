@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
           .from('vocab_list')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-        if (count === 0) return NextResponse.redirect(`${origin}/settings?firstRun=true`)
+        if (count === 0) return NextResponse.redirect(`${origin}/onboarding`)
       }
       return NextResponse.redirect(`${origin}/dashboard`)
     }

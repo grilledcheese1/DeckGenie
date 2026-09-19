@@ -3,29 +3,17 @@
 import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SettingsForm } from '@/components/settings/SettingsForm'
-import { useHideAppShellChrome } from '@/components/shell/AppShellSlots'
 
 function SettingsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isFirstRun = searchParams.get('firstRun') === 'true'
   const highlightApiKey = searchParams.get('focus') === 'apikey'
-
-  // Onboarding intentionally has no "Back" button so a brand-new user can't
-  // leave without picking their settings (which is what seeds their vocab
-  // in SettingsForm.handleSave). AppShell's sidebar would reintroduce that
-  // escape hatch — 5 nav links plus a sign-out — on a user's very first
-  // authenticated screen, so onboarding hides it via this hook.
-  // Non-onboarding visits (from the sidebar's own Settings link, or a
-  // direct URL) keep the full shell since /settings is a persistent nav
-  // destination there.
-  useHideAppShellChrome(isFirstRun)
 
   return (
     <div className="min-h-screen px-4 py-8 sm:px-8 sm:py-12 max-w-3xl mx-auto">
       <SettingsForm
-        mode={isFirstRun ? 'onboarding' : 'edit'}
-        onDone={isFirstRun ? () => router.push('/dashboard') : () => router.back()}
+        mode="edit"
+        onDone={() => router.back()}
         highlightApiKey={highlightApiKey}
       />
     </div>

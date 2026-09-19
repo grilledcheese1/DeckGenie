@@ -27,15 +27,20 @@ interface Props {
  * Lives in the shared `(app)/layout.tsx` rather than inside each page, so
  * it (and `Sidebar`) stay mounted across tab clicks — only `children`
  * swaps on navigation. Because pages are no longer `AppShell`'s direct
- * caller, right-rail content and chrome-hiding (previously a `rightRail`
- * prop and a page choosing not to render `AppShell` at all) are now
- * published up via the `AppShellSlots` context — see `useRightRail`/
- * `useHideAppShellChrome`.
+ * caller, right-rail content (previously a `rightRail` prop) is now
+ * published up via the `AppShellSlots` context — see `useRightRail`.
+ *
+ * Note there is no "hide chrome" equivalent here: a page nested under
+ * this shared layout can only ask AppShell to hide its chrome via an
+ * effect, which can't run until after AppShell has already committed its
+ * normal render — including during SSR, where effects never run at all.
+ * A route that must never show this chrome (settings onboarding, see
+ * `src/app/onboarding/page.tsx`) has to live outside the `(app)` route
+ * group entirely instead.
  */
 export function AppShell({ children }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [railContent, setRailContent] = useState<ReactNode>(null)
-  const [chromeHidden, setChromeHidden] = useState(false)
   const pathname = usePathname()
 
   // Close the drawer on route change. Adjusted during render (React's
@@ -52,23 +57,15 @@ export function AppShell({ children }: Props) {
     if (drawerOpen) setDrawerOpen(false)
   }
 
-  // Memoized: `setRailContent`/`setChromeHidden` are stable forever (useState
-  // setters), so this object's identity should be too. Without this, a new
-  // `slots` object on every AppShell render would change the context
-  // `value` every time, forcing every consumer of `useRightRail`/
-  // `useHideAppShellChrome` (i.e. the current page) to re-render — which
-  // recreates its rail JSX with a new identity, re-triggers that hook's
-  // effect, calls `setRailContent` again, re-renders AppShell again, and
-  // loops forever ("Maximum update depth exceeded").
-  const slots = useMemo(() => ({ setRailContent, setChromeHidden }), [])
-
-  // Chrome-hidden pages (settings onboarding) still need the slots
-  // provider above them — a page unconditionally calls
-  // `useHideAppShellChrome`, so the context must exist even when we're
-  // about to render none of the chrome that would normally consume it.
-  if (chromeHidden) {
-    return <AppShellSlotsProvider value={slots}>{children}</AppShellSlotsProvider>
-  }
+  // Memoized: `setRailContent` is stable forever (a useState setter), so
+  // this object's identity should be too. Without this, a new `slots`
+  // object on every AppShell render would change the context `value`
+  // every time, forcing every consumer of `useRightRail` (i.e. the
+  // current page) to re-render — which recreates its rail JSX with a new
+  // identity, re-triggers that hook's effect, calls `setRailContent`
+  // again, re-renders AppShell again, and loops forever ("Maximum update
+  // depth exceeded").
+  const slots = useMemo(() => ({ setRailContent }), [])
 
   return (
     <AppShellSlotsProvider value={slots}>
