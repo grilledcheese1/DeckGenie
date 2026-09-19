@@ -1,77 +1,77 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { VocabBrowser } from '@/components/vocab/VocabBrowser'
-import { useVocabSheet } from '@/hooks/useVocabSheet'
+import { useRef, useState } from 'react'
 import { useProgress } from '@/hooks/useProgress'
+import { useVocabTable } from '@/hooks/useVocabTable'
+import { VocabPageHeader } from '@/components/vocab/VocabPageHeader'
+import { VocabStatsRow } from '@/components/vocab/VocabStatsRow'
+import { VocabFilterBar } from '@/components/vocab/VocabFilterBar'
+import { VocabTable } from '@/components/vocab/VocabTable'
+import { VocabPagination } from '@/components/vocab/VocabPagination'
+import { FavoritesExpandedPanel } from '@/components/vocab/FavoritesExpandedPanel'
 
-/**
- * Standalone vocabulary browser page — same `VocabBrowser` filter/list/
- * card-toggle content the dashboard's `VocabSheet` overlay uses, just
- * embedded in `AppShell`'s content area instead of a fixed-overlay sheet.
- *
- * Reuses `useVocabSheet` as-is (it's already just data fetching, not
- * overlay-specific). `totalCount` comes from `useProgress`'s `vocabCount`
- * — the same source `dashboard/page.tsx` passes to `VocabSheet` — rather
- * than `words.length`, since `words` is only the current filtered/loaded
- * page.
- */
 export default function VocabularyPage() {
-  const { vocabCount } = useProgress()
+  const { vocabCount, settings } = useProgress()
   const {
-    words, loading, hasMore, filters,
-    open, loadMore, applyFilter, removeWord,
-  } = useVocabSheet()
+    words, totalCount, totalPages, loading, error,
+    page, setPage,
+    hsk, setHsk,
+    pos, setPos,
+    searchInput, setSearchInput,
+    sort, setSort,
+    favorites, setFavorite, unfavorite, deleteWord,
+  } = useVocabTable()
 
-  // `useVocabSheet` initializes `loading: false` and only starts fetching
-  // once `open()` runs inside the effect below (deferred past first
-  // paint) — deliberately so, since `VocabSheet`'s dashboard call site
-  // batches `setSheetOpen(true)` with `openVocab()` so `loading` is
-  // already `true` on its very first render. This page has no such
-  // batching, so without this flag the very first committed render would
-  // see `words: [], loading: false` and flash `VocabBrowser`'s "No words
-  // found" empty state before the fetch has even started. Tracked here,
-  // locally, rather than changing `useVocabSheet` itself (which would
-  // risk `VocabSheet`'s existing behavior).
-  const [initialFetchStarted, setInitialFetchStarted] = useState(false)
-
-  useEffect(() => {
-    // Deferred via an inner async function (matching this codebase's data-
-    // hook convention, e.g. useTodayStats/useWeeklyActivity) rather than
-    // calling setState synchronously in the effect body.
-    async function run() {
-      open()
-      setInitialFetchStarted(true)
-    }
-    run()
-    // `open` is intentionally omitted from the dep array — its identity
-    // changes on every `filters` update (see useVocabSheet), and
-    // filter-driven refetches are already handled by `applyFilter`, so
-    // including it here would refetch on every filter change in addition
-    // to `applyFilter` already doing so.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [favoritesExpanded, setFavoritesExpanded] = useState(false)
+  const favoritesCardRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto flex flex-col">
-      <div className="mb-4">
-        <h1 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Vocabulary</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-          Browse, search, and manage your unlocked words.
-        </p>
-      </div>
+    <div className="min-h-screen px-6 py-8 w-full max-w-6xl mx-auto">
+      <VocabPageHeader vocabCount={vocabCount} hskLevel={settings?.starting_hsk} />
 
-      <VocabBrowser
-        words={words}
-        loading={!initialFetchStarted || loading}
-        hasMore={hasMore}
-        filters={filters}
-        totalCount={vocabCount}
-        onLoadMore={loadMore}
-        onFilterChange={applyFilter}
-        onRemove={removeWord}
-        listClassName="max-h-[65vh]"
+      <VocabStatsRow
+        totalWords={vocabCount}
+        favorites={favorites}
+        onExpandFavorites={() => setFavoritesExpanded(true)}
+        favoritesCardRef={favoritesCardRef}
       />
+
+      <VocabFilterBar
+        hsk={hsk} onHskChange={setHsk}
+        pos={pos} onPosChange={setPos}
+        searchInput={searchInput} onSearchInputChange={setSearchInput}
+        sort={sort} onSortChange={setSort}
+      />
+
+      {error && (
+        <p className="text-xs mb-3" style={{ color: 'var(--error-text)' }} role="alert">
+          Could not load vocabulary: {error}
+        </p>
+      )}
+
+      <VocabTable
+        words={words}
+        loading={loading}
+        onToggleFavorite={word => setFavorite(word, !word.is_favorite)}
+        onDelete={deleteWord}
+      />
+
+      <VocabPagination
+        page={page}
+        totalPages={totalPages}
+        shownCount={words.length}
+        totalCount={totalCount}
+        onPageChange={setPage}
+      />
+
+      {favoritesExpanded && (
+        <FavoritesExpandedPanel
+          favorites={favorites}
+          anchorRef={favoritesCardRef}
+          onUnfavorite={unfavorite}
+          onClose={() => setFavoritesExpanded(false)}
+        />
+      )}
     </div>
   )
 }
