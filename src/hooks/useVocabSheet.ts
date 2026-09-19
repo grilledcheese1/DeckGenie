@@ -20,10 +20,16 @@ export function useVocabSheet() {
   const [hasMore, setHasMore]   = useState(true)
   const [filters, setFilters]   = useState<Filters>({ hsk: null, pos: null, topic: null, search: '' })
   const offsetRef               = useRef(0)
+  const requestIdRef            = useRef(0)
 
   const fetchWords = useCallback(async (reset: boolean, f: Filters) => {
+    const requestId = ++requestIdRef.current
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    // Cached session read (no network `getUser()` round trip), matching
+    // `useProgress.ts`'s read-path convention — RLS scopes the query below
+    // to `auth.uid()` server-side regardless.
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
     if (!user) { setLoading(false); return }
 
     const offset = reset ? 0 : offsetRef.current
@@ -44,6 +50,11 @@ export function useVocabSheet() {
     )
 
     const { data } = await query
+    // A newer call (e.g. a later filter-pill click) has since started —
+    // this response is stale, so don't let it clobber the newer one's
+    // result with an out-of-order resolution.
+    if (requestId !== requestIdRef.current) return
+
     const rows = data ?? []
 
     if (reset) {
@@ -77,7 +88,8 @@ export function useVocabSheet() {
   const removeWord = useCallback(async (id: string) => {
     // Optimistic remove
     setWords(prev => prev.filter(w => w.id !== id))
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
     if (!user) return
     await supabase.from('vocab_list').delete().eq('id', id).eq('user_id', user.id)
   }, [supabase])

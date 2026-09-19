@@ -1,16 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { MotionConfig } from 'motion/react'
 import { Sidebar } from './Sidebar'
 import { MobileTopBar } from './MobileTopBar'
 import { MobileDrawer } from './MobileDrawer'
 import { RightRail } from './RightRail'
+import { AppShellSlotsProvider } from './AppShellSlots'
 
 interface Props {
   children: React.ReactNode
-  rightRail?: React.ReactNode
 }
 
 /**
@@ -23,9 +23,24 @@ interface Props {
  *
  * `AppShell` only composes `Sidebar`/`MobileTopBar`/`MobileDrawer`/
  * `RightRail` — it doesn't reimplement any of their internals.
+ *
+ * Lives in the shared `(app)/layout.tsx` rather than inside each page, so
+ * it (and `Sidebar`) stay mounted across tab clicks — only `children`
+ * swaps on navigation. Because pages are no longer `AppShell`'s direct
+ * caller, right-rail content (previously a `rightRail` prop) is now
+ * published up via the `AppShellSlots` context — see `useRightRail`.
+ *
+ * Note there is no "hide chrome" equivalent here: a page nested under
+ * this shared layout can only ask AppShell to hide its chrome via an
+ * effect, which can't run until after AppShell has already committed its
+ * normal render — including during SSR, where effects never run at all.
+ * A route that must never show this chrome (settings onboarding, see
+ * `src/app/onboarding/page.tsx`) has to live outside the `(app)` route
+ * group entirely instead.
  */
-export function AppShell({ children, rightRail }: Props) {
+export function AppShell({ children }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [railContent, setRailContent] = useState<ReactNode>(null)
   const pathname = usePathname()
 
   // Close the drawer on route change. Adjusted during render (React's
@@ -42,22 +57,34 @@ export function AppShell({ children, rightRail }: Props) {
     if (drawerOpen) setDrawerOpen(false)
   }
 
+  // Memoized: `setRailContent` is stable forever (a useState setter), so
+  // this object's identity should be too. Without this, a new `slots`
+  // object on every AppShell render would change the context `value`
+  // every time, forcing every consumer of `useRightRail` (i.e. the
+  // current page) to re-render — which recreates its rail JSX with a new
+  // identity, re-triggers that hook's effect, calls `setRailContent`
+  // again, re-renders AppShell again, and loops forever ("Maximum update
+  // depth exceeded").
+  const slots = useMemo(() => ({ setRailContent }), [])
+
   return (
-    <MotionConfig reducedMotion="user">
-      <div className="flex min-h-screen">
-        <Sidebar />
+    <AppShellSlotsProvider value={slots}>
+      <MotionConfig reducedMotion="user">
+        <div className="flex min-h-screen">
+          <Sidebar />
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <MobileTopBar onMenuClick={() => setDrawerOpen(true)} />
+          <div className="flex-1 flex flex-col min-w-0">
+            <MobileTopBar onMenuClick={() => setDrawerOpen(true)} />
 
-          <div className="flex-1 flex min-w-0">
-            <main className="flex-1 min-w-0">{children}</main>
-            {rightRail && <RightRail>{rightRail}</RightRail>}
+            <div className="flex-1 flex min-w-0">
+              <main className="flex-1 min-w-0">{children}</main>
+              {railContent && <RightRail>{railContent}</RightRail>}
+            </div>
           </div>
-        </div>
 
-        {drawerOpen && <MobileDrawer onClose={() => setDrawerOpen(false)} />}
-      </div>
-    </MotionConfig>
+          {drawerOpen && <MobileDrawer onClose={() => setDrawerOpen(false)} />}
+        </div>
+      </MotionConfig>
+    </AppShellSlotsProvider>
   )
 }
