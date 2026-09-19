@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProgress } from '@/hooks/useProgress'
 import { useUserEmail, clearCachedEmail } from '@/hooks/useUserEmail'
 import { createClient } from '@/lib/supabase/client'
-import { SETTINGS_CHANGE_EVENT } from '@/lib/settingsEvents'
 import { LayoutGroup } from 'motion/react'
 import { NAV_ITEMS, isNavItemActive } from './navItems'
 import { NavLink } from './NavLink'
@@ -20,26 +19,13 @@ import { Wordmark } from './Wordmark'
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { settings, reload } = useProgress()
+  const { settings } = useProgress()
   const email = useUserEmail()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const chipRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const firstMenuItemRef = useRef<HTMLAnchorElement>(null)
-
-  // Sidebar holds its own independent `useProgress()` instance, separate
-  // from the dashboard page's — without this, changing the HSK level via
-  // the dashboard's pill would leave this chip showing the stale level
-  // until a route change or full refresh. Same cross-component pattern
-  // `THEME_CHANGE_EVENT` uses to keep the dashboard's neon signs in sync.
-  useEffect(() => {
-    function onSettingsChange() {
-      reload()
-    }
-    window.addEventListener(SETTINGS_CHANGE_EVENT, onSettingsChange)
-    return () => window.removeEventListener(SETTINGS_CHANGE_EVENT, onSettingsChange)
-  }, [reload])
 
   // Move focus into the dropdown when it opens.
   useEffect(() => {

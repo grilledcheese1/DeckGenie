@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AppShell } from '@/components/shell/AppShell'
 import { VocabBrowser } from '@/components/vocab/VocabBrowser'
 import { useVocabSheet } from '@/hooks/useVocabSheet'
 import { useProgress } from '@/hooks/useProgress'
@@ -54,27 +53,25 @@ export default function VocabularyPage() {
   }, [])
 
   return (
-    <AppShell>
-      <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto flex flex-col">
-        <div className="mb-4">
-          <h1 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Vocabulary</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            Browse, search, and manage your unlocked words.
-          </p>
-        </div>
-
-        <VocabBrowser
-          words={words}
-          loading={!initialFetchStarted || loading}
-          hasMore={hasMore}
-          filters={filters}
-          totalCount={vocabCount}
-          onLoadMore={loadMore}
-          onFilterChange={applyFilter}
-          onRemove={removeWord}
-          listClassName="max-h-[65vh]"
-        />
+    <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto flex flex-col">
+      <div className="mb-4">
+        <h1 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Vocabulary</h1>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+          Browse, search, and manage your unlocked words.
+        </p>
       </div>
-    </AppShell>
+
+      <VocabBrowser
+        words={words}
+        loading={!initialFetchStarted || loading}
+        hasMore={hasMore}
+        filters={filters}
+        totalCount={vocabCount}
+        onLoadMore={loadMore}
+        onFilterChange={applyFilter}
+        onRemove={removeWord}
+        listClassName="max-h-[65vh]"
+      />
+    </div>
   )
 }

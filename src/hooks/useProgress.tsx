@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { readLocal, writeLocal } from '@/lib/localCache'
 import type { Progress, Settings } from '@/types'
@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   show_pinyin: 'tap', show_hints: 'after',
 }
 
-export function useProgress() {
+function useProgressState() {
   const supabase = createClient()
   // State starts SSR-safe (matches what the server, which has no
   // localStorage, would render) — hydrating synchronously from cache here
@@ -201,4 +201,27 @@ export function useProgress() {
     && roundsCompleted > lastClaimedRound
 
   return { progress, settings, vocabCount, loading, reload: load, incrementSentence, finishRound, resetRoundCounter, claimUnlock, canUnlock }
+}
+
+const ProgressContext = createContext<ReturnType<typeof useProgressState> | null>(null)
+
+/**
+ * Wraps the shared `(app)/layout.tsx` so every authenticated page — and
+ * `Sidebar`, which lives in the same persistent shell — reads from one
+ * `useProgressState()` instance instead of each mounting its own
+ * independent copy (each of which fired its own `getSession()` + 3-query
+ * fetch). This is also why `Sidebar`'s old `SETTINGS_CHANGE_EVENT`
+ * cross-instance sync listener was removed: with one shared instance,
+ * `reload()` from any consumer updates the same `settings`/`progress`
+ * object every other consumer already reads.
+ */
+export function ProgressProvider({ children }: { children: ReactNode }) {
+  const value = useProgressState()
+  return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>
+}
+
+export function useProgress() {
+  const ctx = useContext(ProgressContext)
+  if (!ctx) throw new Error('useProgress must be used within a ProgressProvider')
+  return ctx
 }
