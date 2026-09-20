@@ -159,6 +159,11 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
   const [keyHighlighted, setKeyHighlighted] = useState(false)
   const apiKeySectionRef = useRef<HTMLDivElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
+  // Editing the key input mid-request resets keyStatus to 'untested'
+  // (re-enabling "Test key") without cancelling the in-flight request --
+  // same request-id-guard pattern as useVocabSheet.ts/useVocabTable.ts,
+  // so a slower, older response can't clobber a newer one's result.
+  const validateKeyRequestIdRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -230,6 +235,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
 
   async function testApiKey() {
     if (!apiKey.trim()) return
+    const requestId = ++validateKeyRequestIdRef.current
     setKeyStatus('testing')
     setKeyErrorReason(null)
     try {
@@ -239,9 +245,14 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
         body: JSON.stringify({ apiKey }),
       })
       const data = await res.json()
+      // A newer request (key edited + re-tested while this one was still
+      // in flight) has since started -- this response is stale, don't
+      // let it overwrite the newer request's result.
+      if (requestId !== validateKeyRequestIdRef.current) return
       setKeyStatus(data?.valid ? 'valid' : 'invalid')
       if (!data?.valid && typeof data?.reason === 'string') setKeyErrorReason(data.reason)
     } catch {
+      if (requestId !== validateKeyRequestIdRef.current) return
       setKeyStatus('invalid')
     }
   }
