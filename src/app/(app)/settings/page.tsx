@@ -3,11 +3,13 @@
 import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SettingsForm } from '@/components/settings/SettingsForm'
+import { useProgress } from '@/hooks/useProgress'
 
 function SettingsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const highlightApiKey = searchParams.get('focus') === 'apikey'
+  const { reload } = useProgress()
 
   return (
     <div className="min-h-screen px-4 py-8 sm:px-8 sm:py-12 max-w-3xl mx-auto">
@@ -15,6 +17,7 @@ function SettingsInner() {
         mode="edit"
         onDone={() => router.back()}
         highlightApiKey={highlightApiKey}
+        onSaved={reload}
       />
     </div>
   )

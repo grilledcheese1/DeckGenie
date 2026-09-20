@@ -17,13 +17,24 @@ export async function POST(req: NextRequest) {
   try {
     const client = new Anthropic({ apiKey })
     await client.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1,
       messages: [{ role: 'user', content: 'Hi' }],
     })
     return NextResponse.json({ valid: true })
-  } catch {
-    // Never log the error — it may embed the caller-supplied key.
-    return NextResponse.json({ valid: false })
+  } catch (err) {
+    // Never log the raw error — safe to inspect its *structured* fields
+    // (Anthropic's own descriptive `error.type`/`error.message`, e.g.
+    // "This API key is not scoped to a workspace...") since those never
+    // echo back the caller-supplied key, but we don't log the request
+    // itself. Surface that reason to the client instead of a bare
+    // "invalid" — a syntactically-valid-but-unscoped key (a common
+    // real case, confirmed while diagnosing this) reads as "wrong key"
+    // otherwise, when the actual fix is generating a workspace-scoped
+    // key in the Anthropic Console rather than retyping anything here.
+    const reason = err instanceof Anthropic.APIError
+      ? (err.error as { error?: { message?: string } } | undefined)?.error?.message
+      : undefined
+    return NextResponse.json({ valid: false, reason })
   }
 }

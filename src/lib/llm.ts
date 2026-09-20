@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-sonnet-5'
 
 export class ClaudeResponseError extends Error {
   constructor(message: string, readonly cause?: unknown) {

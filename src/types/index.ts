@@ -25,6 +25,12 @@ export interface VocabWord {
   unlocked_at: string
   times_seen: number
   times_correct: number
+  /** Server-maintained by the `record_word_attempt` RPC after every graded
+   *  attempt (see `/api/grade/route.ts`) — this column has existed in the
+   *  DB since migration `20260806023645_remote_schema.sql`, it was just
+   *  never added to this type until now. */
+  mastery_level: 'learning' | 'reviewing' | 'mastered'
+  is_favorite: boolean
 }
 
 export interface Progress {

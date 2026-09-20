@@ -43,6 +43,19 @@ interface Props {
   onDone: () => void
   onBack?: () => void
   highlightApiKey?: boolean
+  /**
+   * Called right after a successful save, before `onDone`. `SettingsForm`
+   * writes straight to Supabase (and to its own `hanzi_settings`
+   * localStorage cache) without going through `useProgress()` — it can't
+   * call that hook directly, since `mode === 'onboarding'` renders outside
+   * `ProgressProvider` (src/app/onboarding/page.tsx). The `mode === 'edit'`
+   * caller (which *is* inside the provider) passes its `reload` here so
+   * the shared context — which now stays mounted across client-side nav
+   * instead of remounting per page — picks up the change immediately,
+   * instead of every other already-mounted page reading stale settings
+   * until a hard reload.
+   */
+  onSaved?: () => void
 }
 
 /* ── small presentational bits ─────────────────────────────────────── */
@@ -124,7 +137,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
 
 /* ── form ──────────────────────────────────────────────────────────── */
 
-export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
+export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }: Props) {
   const isFirstRun = mode === 'onboarding'
   const supabase = createClient()
 
@@ -142,9 +155,15 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
   // API key is local-only — persisted to localStorage, never to Supabase.
   const [apiKey, setApiKey] = useState('')
   const [keyStatus, setKeyStatus] = useState<'untested' | 'testing' | 'valid' | 'invalid'>('untested')
+  const [keyErrorReason, setKeyErrorReason] = useState<string | null>(null)
   const [keyHighlighted, setKeyHighlighted] = useState(false)
   const apiKeySectionRef = useRef<HTMLDivElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
+  // Editing the key input mid-request resets keyStatus to 'untested'
+  // (re-enabling "Test key") without cancelling the in-flight request --
+  // same request-id-guard pattern as useVocabSheet.ts/useVocabTable.ts,
+  // so a slower, older response can't clobber a newer one's result.
+  const validateKeyRequestIdRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -197,6 +216,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
       }
     } catch (e) { setSaveError(String(e)); setSaving(false); return }
     localStorage.setItem('hanzi_settings', JSON.stringify(settings))
+    onSaved?.()
     if (isFirstRun) {
       try {
         await fetch('/api/words', {
@@ -215,7 +235,9 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
 
   async function testApiKey() {
     if (!apiKey.trim()) return
+    const requestId = ++validateKeyRequestIdRef.current
     setKeyStatus('testing')
+    setKeyErrorReason(null)
     try {
       const res = await fetch('/api/validate-key', {
         method: 'POST',
@@ -223,8 +245,14 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
         body: JSON.stringify({ apiKey }),
       })
       const data = await res.json()
+      // A newer request (key edited + re-tested while this one was still
+      // in flight) has since started -- this response is stale, don't
+      // let it overwrite the newer request's result.
+      if (requestId !== validateKeyRequestIdRef.current) return
       setKeyStatus(data?.valid ? 'valid' : 'invalid')
+      if (!data?.valid && typeof data?.reason === 'string') setKeyErrorReason(data.reason)
     } catch {
+      if (requestId !== validateKeyRequestIdRef.current) return
       setKeyStatus('invalid')
     }
   }
@@ -383,6 +411,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
                         setApiKey(e.target.value)
                         saveApiKey(e.target.value)
                         setKeyStatus('untested')
+                        setKeyErrorReason(null)
                       }}
                       placeholder="sk-ant-..."
                       className="flex-1 rounded-xl px-3 py-2.5 text-sm"
@@ -411,7 +440,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey }: Props) {
                     >
                       {keyStatus === 'testing' && 'Checking key…'}
                       {keyStatus === 'valid' && 'Key is valid'}
-                      {keyStatus === 'invalid' && 'Key is invalid'}
+                      {keyStatus === 'invalid' && (keyErrorReason ?? 'Key is invalid')}
                     </p>
                   )}
                 </div>
