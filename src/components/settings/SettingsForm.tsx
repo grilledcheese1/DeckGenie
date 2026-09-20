@@ -155,6 +155,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
   // API key is local-only — persisted to localStorage, never to Supabase.
   const [apiKey, setApiKey] = useState('')
   const [keyStatus, setKeyStatus] = useState<'untested' | 'testing' | 'valid' | 'invalid'>('untested')
+  const [keyErrorReason, setKeyErrorReason] = useState<string | null>(null)
   const [keyHighlighted, setKeyHighlighted] = useState(false)
   const apiKeySectionRef = useRef<HTMLDivElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
@@ -230,6 +231,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
   async function testApiKey() {
     if (!apiKey.trim()) return
     setKeyStatus('testing')
+    setKeyErrorReason(null)
     try {
       const res = await fetch('/api/validate-key', {
         method: 'POST',
@@ -238,6 +240,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
       })
       const data = await res.json()
       setKeyStatus(data?.valid ? 'valid' : 'invalid')
+      if (!data?.valid && typeof data?.reason === 'string') setKeyErrorReason(data.reason)
     } catch {
       setKeyStatus('invalid')
     }
@@ -397,6 +400,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
                         setApiKey(e.target.value)
                         saveApiKey(e.target.value)
                         setKeyStatus('untested')
+                        setKeyErrorReason(null)
                       }}
                       placeholder="sk-ant-..."
                       className="flex-1 rounded-xl px-3 py-2.5 text-sm"
@@ -425,7 +429,7 @@ export function SettingsForm({ mode, onDone, onBack, highlightApiKey, onSaved }:
                     >
                       {keyStatus === 'testing' && 'Checking key…'}
                       {keyStatus === 'valid' && 'Key is valid'}
-                      {keyStatus === 'invalid' && 'Key is invalid'}
+                      {keyStatus === 'invalid' && (keyErrorReason ?? 'Key is invalid')}
                     </p>
                   )}
                 </div>
