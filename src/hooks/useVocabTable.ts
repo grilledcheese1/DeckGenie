@@ -186,29 +186,49 @@ export function useVocabTable() {
     }
   }, [supabase, fetchFavorites])
 
-  const deleteWord = useCallback(async (id: string) => {
+  // Unlike setFavorite/unfavorite (optimistic + roll back on failure),
+  // this awaits confirmation first -- a destructive delete that silently
+  // "un-deletes" itself back into the list on failure is more confusing
+  // than a brief wait, and skipping the optimistic update means there's
+  // nothing to roll back if there's no session or the delete errors.
+  const deleteWord = useCallback(async (id: string): Promise<boolean> => {
     const wasOnlyItemOnPage = words.length === 1
-    setWords(prev => prev.filter(w => w.id !== id))
-    setTotalCount(prev => Math.max(0, prev - 1))
-    setFavorites(prev => prev.filter(f => f.id !== id))
 
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user ?? null
-    if (user) {
-      const { error: deleteError } = await supabase
-        .from('vocab_list')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id)
-      if (deleteError) {
-        console.error('useVocabTable: failed to delete word:', deleteError.message)
-      }
+    if (!user) {
+      console.error('useVocabTable: failed to delete word: no active session')
+      return false
     }
 
-    if (wasOnlyItemOnPage && query.page > 1) {
-      setQuery(q => ({ ...q, page: q.page - 1 }))
+    const { error: deleteError } = await supabase
+      .from('vocab_list')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (deleteError) {
+      console.error('useVocabTable: failed to delete word:', deleteError.message)
+      return false
     }
-  }, [supabase, words.length, query.page])
+
+    setFavorites(prev => prev.filter(f => f.id !== id))
+
+    if (wasOnlyItemOnPage && query.page > 1) {
+      // Triggers fetchPage via the effect above, now against the
+      // decremented page.
+      setQuery(q => ({ ...q, page: q.page - 1 }))
+    } else {
+      // Refetch the current page rather than just filtering `words`
+      // locally -- with fixed-offset pagination, removing one row from
+      // the middle of a page should backfill from what used to be the
+      // next offset, not just leave the page one item short of
+      // PAGE_SIZE until the user navigates away and back.
+      fetchPage()
+    }
+
+    return true
+  }, [supabase, words.length, query.page, fetchPage])
 
   return {
     words, totalCount, totalPages, loading, error,
